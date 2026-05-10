@@ -39,6 +39,7 @@ export function useApproveUsdc() {
   const { writeContract, data: hash, isPending, error, reset: resetWrite } = useWriteContract();
   const { isLoading: isConfirming, isSuccess, error: receiptError } = useWaitForTransactionReceipt({
     hash,
+    pollingInterval: 2_000,
   });
   const publicClient = usePublicClient();
   const { address: account } = useAccount();
@@ -94,7 +95,7 @@ export function useCreatePosition() {
     isSuccess,
     isError: isReceiptError,
     error: receiptError,
-  } = useWaitForTransactionReceipt({ hash });
+  } = useWaitForTransactionReceipt({ hash, pollingInterval: 2_000 });
   const publicClient = usePublicClient();
   const { address: account } = useAccount();
   const { data: contractInfo } = useContractInfo();
@@ -185,6 +186,7 @@ export function useRequestClose() {
   const { writeContract, data: hash, isPending, error, reset: resetWrite } = useWriteContract();
   const { isLoading: isConfirming, isSuccess, error: receiptError } = useWaitForTransactionReceipt({
     hash,
+    pollingInterval: 2_000,
   });
   const publicClient = usePublicClient();
   const { address: account } = useAccount();

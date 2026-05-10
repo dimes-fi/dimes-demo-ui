@@ -638,7 +638,7 @@ export function TradePanel({
         {draft && (
           <QuoteDetails
             offer={walletOpen ? promotedOffer! : draft}
-            hideExpiry={!walletOpen}
+            hideExpiry={!walletOpen || createConfirming}
             previousOffer={isMarketMoved ? tradeState.originalDraft : correctedFrom}
             quotedAt={quotedAt}
             onRefresh={handleGetQuote}
@@ -691,7 +691,7 @@ export function TradePanel({
         )}
 
         {draft && !createSuccess && !isDemoMode && !isMarketMoved && (
-          isOfferExpired ? (
+          (isOfferExpired && !createPending && !createConfirming) ? (
             <div style={{ marginTop: 12 }}>
               <Button
                 variant="primary"
@@ -705,6 +705,8 @@ export function TradePanel({
                 Quote expired — re-quote
               </Button>
             </div>
+          ) : (createPending || createConfirming) ? (
+            <TxProgress step={createConfirming ? 'confirming' : 'signing'} />
           ) : (
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               {!canCreate && (
@@ -721,17 +723,13 @@ export function TradePanel({
                 variant="primary"
                 fullWidth
                 onClick={handleCreate}
-                disabled={!canCreate || isPromoting || createPending || createConfirming}
+                disabled={!canCreate || isPromoting}
               >
-                {createConfirming
-                  ? 'Confirming…'
-                  : createPending
-                    ? 'Confirm in wallet…'
-                    : isCorrecting
-                      ? 'Adjusting…'
-                      : isPromoting
-                        ? 'Creating…'
-                        : 'Create position'}
+                {isCorrecting
+                  ? 'Adjusting…'
+                  : isPromoting
+                    ? 'Creating…'
+                    : 'Create position'}
               </Button>
             </div>
           )
@@ -794,6 +792,84 @@ function SideButton({
         </span>
       ) : null}
     </button>
+  )
+}
+
+const TX_STEPS = [
+  { key: 'signing', label: 'Confirm in wallet' },
+  { key: 'confirming', label: 'Waiting for on-chain confirmation' },
+] as const
+
+function TxProgress({ step }: { step: 'signing' | 'confirming' }) {
+  const activeIdx = TX_STEPS.findIndex((s) => s.key === step)
+
+  return (
+    <div
+      style={{
+        marginTop: 14,
+        padding: '16px',
+        borderRadius: 'var(--radius)',
+        background: 'rgba(238,255,0,0.04)',
+        border: '1px solid rgba(238,255,0,0.12)',
+      }}
+    >
+      {TX_STEPS.map((s, i) => {
+        const done = i < activeIdx
+        const active = i === activeIdx
+        return (
+          <div
+            key={s.key}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '6px 0',
+              opacity: done ? 0.5 : 1,
+            }}
+          >
+            <span
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 10,
+                fontWeight: 700,
+                flexShrink: 0,
+                border: active
+                  ? '2px solid var(--yellow)'
+                  : done
+                    ? '2px solid rgba(238,255,0,0.4)'
+                    : '2px solid rgba(255,255,255,0.15)',
+                background: done ? 'rgba(238,255,0,0.15)' : 'transparent',
+                color: done ? 'var(--yellow)' : active ? 'var(--yellow)' : 'var(--text-dim)',
+                animation: active ? 'txStepPulse 1.5s ease-in-out infinite' : 'none',
+              }}
+            >
+              {done ? '✓' : i + 1}
+            </span>
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: active ? 600 : 400,
+                color: active ? 'var(--yellow)' : done ? 'var(--text-muted)' : 'var(--text-dim)',
+              }}
+            >
+              {s.label}
+              {active && '…'}
+            </span>
+          </div>
+        )
+      })}
+      <style>{`
+        @keyframes txStepPulse {
+          0%, 100% { border-color: var(--yellow); }
+          50% { border-color: rgba(238,255,0,0.3); }
+        }
+      `}</style>
+    </div>
   )
 }
 
