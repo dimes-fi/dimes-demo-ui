@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { useAutoAuth } from './hooks/useAutoAuth'
+import { usePositionSocket } from './hooks/usePositionSocket'
 import { useAuthStore } from './store/auth'
 import type { Market } from './api/types'
 import { Layout } from './components/Layout'
+import { ToastContainer } from './components/ToastContainer'
 import { Header } from './components/Header'
 import { Hero } from './components/Hero'
 import { MarketList } from './components/MarketList'
@@ -36,6 +38,7 @@ function MarketsTitle({ count }: { count?: number }) {
 function App() {
   const { isConnected } = useAccount()
   useAutoAuth()
+  usePositionSocket()
   const jwt = useAuthStore((s) => s.jwt)
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   const [marketCount, setMarketCount] = useState<number | undefined>(undefined)
@@ -54,6 +57,7 @@ function App() {
 
   return (
     <Layout>
+      <ToastContainer />
       {isConnected && <Header />}
 
       <main style={{ padding: '24px 0' }}>

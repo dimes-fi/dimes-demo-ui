@@ -28,6 +28,9 @@ export function PositionCard({
   const isVoided = position.timing.isVoided && position.timing.isSettlementPending
   const isInFlight = isPendingPosition || isClosingPosition || isSettlingPosition || isUnwindingPosition
 
+  const openLatencyMs = (position.entry as Record<string, unknown>).openLatencyMs as number | null | undefined
+  const openLatencyDisplay = openLatencyMs != null ? `${(openLatencyMs / 1000).toFixed(1)}s` : null
+
   const isYes = position.side === 'yes'
   const pnlValue = parseFloat(position.current.unrealizedPnlUsd)
   const netPnlColor = (() => {
@@ -223,6 +226,11 @@ export function PositionCard({
                 copyToClipboard(position.id, 'positionId')
               }}
             />
+            {openLatencyDisplay && (
+              <span style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.5, marginTop: 2 }}>
+                opened in {openLatencyDisplay}
+              </span>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <span
