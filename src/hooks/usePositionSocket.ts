@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { PositionSocket } from '@dimes-dot-fi/sdk/ws'
-import type { PositionEvent } from '@dimes-dot-fi/sdk/ws'
+import type { NotificationEvent, PositionEvent } from '@dimes-dot-fi/sdk/ws'
 import type { Position } from '../api/types'
 import { useAuthStore } from '../store/auth'
 import { usePendingPositionsStore } from '../store/pendingPositions'
@@ -19,12 +19,21 @@ export function usePositionSocket() {
   const addToast = useToastStore((s) => s.add)
   const removePending = usePendingPositionsStore((s) => s.remove)
 
+  const handleNotification = useCallback(
+    (event: NotificationEvent) => {
+      addToast({
+        title: event.data.message,
+        variant: 'info',
+        durationMs: 5000,
+      })
+    },
+    [addToast],
+  )
+
   const handleEvent = useCallback(
     (event: PositionEvent) => {
       const position = event.data as Position
       const positionId = position.id
-
-      wsTimestamps.set(positionId, Date.now())
 
       queryClient.setQueriesData<Position[]>(
         { queryKey: ['positions'] },
@@ -42,6 +51,8 @@ export function usePositionSocket() {
           return old
         },
       )
+
+      wsTimestamps.set(positionId, Date.now())
 
       if (
         event.type === 'position.created' ||
@@ -70,6 +81,7 @@ export function usePositionSocket() {
     })
 
     const unsubEvent = socket.on('*', handleEvent)
+    const unsubNotification = socket.onNotification(handleNotification)
 
     let isFirstConnect = true
     const unsubReconnect = socket.onConnect(() => {
@@ -95,9 +107,10 @@ export function usePositionSocket() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility)
       unsubEvent()
+      unsubNotification()
       unsubReconnect()
       socket.disconnect()
       socketRef.current = null
     }
-  }, [walletAddress, handleEvent, queryClient])
+  }, [walletAddress, handleEvent, handleNotification, queryClient])
 }
