@@ -1,6 +1,5 @@
 // Re-export from the SDK
 import { formatContractError as sdkFormatContractError } from '@dimes-dot-fi/sdk/contract';
-import type { DimesContractError } from '@dimes-dot-fi/sdk';
 
 export type FormattedContractError = {
   message: string;

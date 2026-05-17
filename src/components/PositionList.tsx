@@ -171,7 +171,7 @@ export function PositionList() {
       {/* Detail drawer */}
       <PositionDetailDrawer
         position={selectedPosition}
-        unwinds={selectedUnwinds}
+        unwinds={selectedUnwinds ?? undefined}
         isUnwindsLoading={false}
         open={drawerOpen}
         onClose={() => setSelectedPosition(null)}

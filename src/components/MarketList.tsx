@@ -2,7 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useMarkets } from '../hooks/useMarkets'
 import type { Market } from '../api/types'
-import { leverageMaxBps } from '../api/types'
+import {
+  leverageMaxBps,
+  getSidedEligibility,
+  rejectionReasonText,
+} from '../api/types'
 
 function getQueryParam(key: string): string | undefined {
   const value = new URLSearchParams(window.location.search).get(key)
@@ -32,12 +36,6 @@ const STATUS_DESCRIPTIONS: Record<string, string> = {
   determined: 'Outcome determined, awaiting finalization',
   finalized: 'Resolved and finalized on-chain',
   disputed: 'Outcome under dispute',
-}
-
-function rejectionReadable(code: string | null | undefined) {
-  if (!code) return 'Not eligible for new positions'
-  const stripped = code.replace(/^quote_/i, '').replace(/_/g, ' ').toLowerCase()
-  return stripped.charAt(0).toUpperCase() + stripped.slice(1)
 }
 
 export function MarketList({
@@ -254,13 +252,12 @@ export function MarketList({
                 <col style={{ width: 'auto' }} />
                 <col style={{ width: 90 }} />
                 <col style={{ width: 90 }} />
-                <col style={{ width: 140 }} />
-                <col style={{ width: 90 }} />
+                <col style={{ width: 240 }} />
                 <col style={{ width: 60 }} />
               </colgroup>
               <thead>
                 <tr>
-                  {['Title', 'Category', 'Status', 'Eligible', 'Max Lev.', 'Ticker'].map((label, i) => (
+                  {['Title', 'Category', 'Status', 'Sides', 'Ticker'].map((label, i) => (
                     <th
                       key={label}
                       style={{
@@ -336,7 +333,9 @@ function MarketRow({
 }) {
   const [hovered, setHovered] = useState(false)
 
-  const maxLeverage = (Math.max(leverageMaxBps(market.leverage, 'yes'), leverageMaxBps(market.leverage, 'no')) / 10000).toFixed(0)
+  const maxLevYes = (leverageMaxBps(market.leverage, 'yes') / 10000).toFixed(2)
+  const maxLevNo = (leverageMaxBps(market.leverage, 'no') / 10000).toFixed(2)
+  const eligibility = getSidedEligibility(market)
 
   const tdStyle: React.CSSProperties = {
     padding: '12px 14px',
@@ -409,11 +408,11 @@ function MarketRow({
           style={{
             fontSize: 11,
             fontWeight: 500,
-            color: market.status === 'open' ? 'var(--green)' : 'var(--text-muted)',
+            color: market.status === 'active' ? 'var(--green)' : 'var(--text-muted)',
             background:
-              market.status === 'open' ? 'var(--green-soft)' : 'var(--border)',
+              market.status === 'active' ? 'var(--green-soft)' : 'var(--border)',
             border: `1px solid ${
-              market.status === 'open' ? 'rgba(68,255,151,0.2)' : 'var(--border)'
+              market.status === 'active' ? 'rgba(68,255,151,0.2)' : 'var(--border)'
             }`,
             borderRadius: 0,
             padding: '2px 8px',
@@ -425,45 +424,10 @@ function MarketRow({
         </span>
       </td>
       <td style={{ ...tdStyle, textAlign: 'center', overflow: 'visible' }}>
-        {market.acceptingNewPositions ? (
-          <span
-            title="Accepting new leveraged positions"
-            style={{
-              fontSize: 11,
-              fontWeight: 500,
-              color: 'var(--green)',
-              background: 'var(--green-soft)',
-              border: '1px solid rgba(68,255,151,0.2)',
-              borderRadius: 0,
-              padding: '2px 8px',
-              cursor: 'help',
-            }}
-          >
-            YES
-          </span>
-        ) : (
-          <span
-            title={rejectionReadable(market.rejectionReasonCode)}
-            style={{
-              fontSize: 11,
-              fontWeight: 500,
-              color: '#FF6B6B',
-              background: 'rgba(255,107,107,0.08)',
-              border: '1px solid rgba(255,107,107,0.2)',
-              borderRadius: 0,
-              padding: '2px 8px',
-              cursor: 'help',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {market.rejectionReasonCode
-              ? market.rejectionReasonCode.replace(/^QUOTE_/, '').replaceAll('_', ' ')
-              : 'NO'}
-          </span>
-        )}
-      </td>
-      <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: '#ffffff' }}>
-        {maxLeverage}x
+        <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+          <SidePill side="yes" eligibility={eligibility.yes} maxLevX={maxLevYes} />
+          <SidePill side="no" eligibility={eligibility.no} maxLevX={maxLevNo} />
+        </div>
       </td>
       <td style={{ ...tdStyle, textAlign: 'center' }}>
         <button
@@ -496,6 +460,57 @@ function MarketRow({
         </button>
       </td>
     </tr>
+  )
+}
+
+function SidePill({
+  side,
+  eligibility,
+  maxLevX,
+}: {
+  side: 'yes' | 'no'
+  eligibility: { open: boolean; reasonCode: string | null }
+  maxLevX: string
+}) {
+  const label = side.toUpperCase()
+  if (eligibility.open) {
+    return (
+      <span
+        title={`${label}: max ${maxLevX}× leverage`}
+        style={{
+          fontSize: 11,
+          fontWeight: 500,
+          color: 'var(--green)',
+          background: 'var(--green-soft)',
+          border: '1px solid rgba(68,255,151,0.2)',
+          borderRadius: 0,
+          padding: '2px 8px',
+          cursor: 'help',
+          fontVariantNumeric: 'tabular-nums',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {label} {maxLevX}×
+      </span>
+    )
+  }
+  return (
+    <span
+      title={`${label}: ${rejectionReasonText(eligibility.reasonCode)}`}
+      style={{
+        fontSize: 11,
+        fontWeight: 500,
+        color: '#FF6B6B',
+        background: 'rgba(255,107,107,0.08)',
+        border: '1px solid rgba(255,107,107,0.2)',
+        borderRadius: 0,
+        padding: '2px 8px',
+        cursor: 'help',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label} ×
+    </span>
   )
 }
 
@@ -533,8 +548,7 @@ function MarketListSkeleton() {
           <col style={{ width: 'auto' }} />
           <col style={{ width: 90 }} />
           <col style={{ width: 90 }} />
-          <col style={{ width: 90 }} />
-          <col style={{ width: 90 }} />
+          <col style={{ width: 240 }} />
           <col style={{ width: 60 }} />
         </colgroup>
         <thead>
@@ -542,8 +556,7 @@ function MarketListSkeleton() {
             <th style={thStyle}>Title</th>
             <th style={{ ...thStyle, textAlign: 'center' }}>Category</th>
             <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
-            <th style={{ ...thStyle, textAlign: 'center' }}>Eligible</th>
-            <th style={{ ...thStyle, textAlign: 'center' }}>Max Lev.</th>
+            <th style={{ ...thStyle, textAlign: 'center' }}>Sides</th>
             <th style={{ ...thStyle, textAlign: 'center' }}>Ticker</th>
           </tr>
         </thead>
@@ -568,15 +581,16 @@ function MarketListSkeleton() {
                   open
                 </span>
               </td>
-              {/* Eligible — bordered badge */}
+              {/* Sides — two pill placeholders */}
               <td style={{ ...tdStyle, textAlign: 'center' }}>
-                <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.04)', color: 'transparent', ...pulse(r, 3) }}>
-                  YES
-                </span>
-              </td>
-              {/* Max Lev — plain text */}
-              <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600 }}>
-                <span style={{ color: 'transparent', background: 'rgba(255,255,255,0.06)', ...pulse(r, 4) }}>5x</span>
+                <div style={{ display: 'inline-flex', gap: 4 }}>
+                  <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.04)', color: 'transparent', ...pulse(r, 3) }}>
+                    YES 5×
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.04)', color: 'transparent', ...pulse(r, 4) }}>
+                    NO 5×
+                  </span>
+                </div>
               </td>
               {/* Ticker — button with border + svg size */}
               <td style={{ ...tdStyle, textAlign: 'center' }}>

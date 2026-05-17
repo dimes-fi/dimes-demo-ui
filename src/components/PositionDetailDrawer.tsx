@@ -5,7 +5,7 @@ import type {
   ClosedPosition,
   PositionUnwindList,
 } from '../api/types'
-import { isOpenPosition } from '../api/types'
+import { isOpenPosition, getOriginationFeeBreakdown } from '../api/types'
 import { useQueryClient } from '@tanstack/react-query'
 import { isDemoMode } from '../api/auth'
 import { useRequestClose } from '../contract/hooks'
@@ -232,6 +232,7 @@ function OpenPositionDetail({
   const cancelSucceeded = cancelMutation.isSuccess && cancelMutation.data === 'cancelled'
   const cancelAlreadyInFlight = cancelMutation.isSuccess && cancelMutation.data === 'already_cancelling'
   const isBusy = cancelMutation.isPending || cancelSucceeded || isCloseSigning || isCloseConfirming
+  const [confirming, setConfirming] = useState(false)
   const actionError: unknown = isPendingPosition
     ? cancelMutation.error
     : closeSimError ?? closeChainError ?? closeReceiptError
@@ -277,7 +278,7 @@ function OpenPositionDetail({
   const netPnlPrefix = netPnlValue >= 0 ? '+' : ''
   const filledPrice = position.entry.effectiveEntryPriceUsd
   const slippageBps = position.entry.effectiveSlippageBps
-  const slippageText = formatSlippageBps(slippageBps)
+  const slippageText = formatSlippageBps(slippageBps ?? null)
   const slippageColor =
     slippageBps == null
       ? 'var(--text-muted)'
@@ -460,10 +461,31 @@ function OpenPositionDetail({
             value={`${netPnlPrefix}$${Math.abs(netPnlValue).toFixed(2)} (${netPnlPrefix}${netRoePct.toFixed(1)}%)`}
             valueColor={netPnlColor}
           />
-          <StatRow
-            label="Origination Fee"
-            value={`$${parseFloat(position.entry.originationFeeUsd).toFixed(2)} (${(position.entry.originationFeeBps / 100).toFixed(2)}%)`}
-          />
+          {(() => {
+            const fee = getOriginationFeeBreakdown(position)
+            return (
+              <>
+                <StatRow
+                  label="Origination Fee"
+                  value={`$${fee.totalUsd.toFixed(2)} (${(fee.totalBps / 100).toFixed(2)}%)`}
+                />
+                {fee.partnerBps > 0 && (
+                  <>
+                    <StatRow
+                      nested
+                      label="Protocol"
+                      value={`$${fee.protocolUsd.toFixed(2)} (${(fee.protocolBps / 100).toFixed(2)}%)`}
+                    />
+                    <StatRow
+                      nested
+                      label="Partner"
+                      value={`$${fee.partnerUsd.toFixed(2)} (${(fee.partnerBps / 100).toFixed(2)}%)`}
+                    />
+                  </>
+                )}
+              </>
+            )
+          })()}
           <StatRow
             label="Time-based fees accrued"
             value={`$${accruedFees.toFixed(2)}`}
@@ -514,9 +536,16 @@ function OpenPositionDetail({
           )}
         </StatGroup>
 
-        {canAct && (
+        {canAct && !confirming && (
           <button
-            onClick={handleAction}
+            onClick={() => {
+              if (isBusy) return
+              if (cancelMutation.error || closeSimError || closeChainError || closeReceiptError) {
+                handleAction()
+                return
+              }
+              setConfirming(true)
+            }}
             disabled={isBusy}
             style={{
               width: '100%',
@@ -535,6 +564,69 @@ function OpenPositionDetail({
           >
             {buttonLabel}
           </button>
+        )}
+
+        {canAct && confirming && (
+          <div
+            style={{
+              marginTop: 16,
+              border: '1px solid rgba(255,255,255,0.15)',
+              padding: '12px 14px',
+              background: 'rgba(255,255,255,0.03)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                color: 'var(--text)',
+                marginBottom: 10,
+                lineHeight: 1.4,
+              }}
+            >
+              {isPendingPosition
+                ? 'Cancel this pending position? Your collateral will be returned once the cancellation is processed.'
+                : 'Close this position? This will request an on-chain unwind at the current market price.'}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setConfirming(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  borderRadius: 0,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'transparent',
+                  color: 'rgba(255,255,255,0.6)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font)',
+                }}
+              >
+                Keep open
+              </button>
+              <button
+                onClick={() => {
+                  setConfirming(false)
+                  handleAction()
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  borderRadius: 0,
+                  border: '1px solid rgba(224,82,82,0.4)',
+                  background: 'rgba(224,82,82,0.08)',
+                  color: 'var(--red)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font)',
+                }}
+              >
+                {isPendingPosition ? 'Cancel position' : 'Close position'}
+              </button>
+            </div>
+          </div>
         )}
 
         <ErrorBanner error={actionError} onDismiss={dismissError} />
@@ -598,7 +690,7 @@ function ClosedPositionDetail({
 
   const filledPrice = position.entry.effectiveEntryPriceUsd
   const slippageBps = position.entry.effectiveSlippageBps
-  const slippageText = formatSlippageBps(slippageBps)
+  const slippageText = formatSlippageBps(slippageBps ?? null)
   const slippageColor =
     slippageBps == null
       ? 'var(--text-muted)'
@@ -611,9 +703,8 @@ function ClosedPositionDetail({
   const reason = reasonLabels[position.closeReason] || position.closeReason
   const isLiquidated = position.closeReason === 'liquidated'
   const isReverted = position.closeReason === 'reverted'
-  const isCancelled = position.closeReason === 'cancelled'
   const rawFailureCode = position.failure?.reason ?? null
-  const showFailureExplanation = isReverted || (isCancelled && !!rawFailureCode)
+  const showFailureExplanation = isReverted
   const failureExplanation = showFailureExplanation
     ? describeFailureReason(rawFailureCode)
     : null
@@ -691,7 +782,20 @@ function ClosedPositionDetail({
             valueColor={pnlColor}
           />
           <StatRow label="Total Fees" value={`$${position.fees.totalFeesUsd}`} />
-          <StatRow label="Origination Fee" value={`$${position.fees.originationFeeUsd}`} />
+          {(() => {
+            const fee = getOriginationFeeBreakdown(position)
+            return (
+              <>
+                <StatRow label="Origination Fee" value={`$${fee.totalUsd.toFixed(2)} (${(fee.totalBps / 100).toFixed(2)}%)`} />
+                {fee.partnerBps > 0 && (
+                  <>
+                    <StatRow nested label="Protocol" value={`$${fee.protocolUsd.toFixed(2)} (${(fee.protocolBps / 100).toFixed(2)}%)`} />
+                    <StatRow nested label="Partner" value={`$${fee.partnerUsd.toFixed(2)} (${(fee.partnerBps / 100).toFixed(2)}%)`} />
+                  </>
+                )}
+              </>
+            )
+          })()}
           <StatRow label="Lifetime Fee" value={`$${position.fees.totalLifetimeFeeUsd}`} />
           <StatRow
             label="Execution Slippage"

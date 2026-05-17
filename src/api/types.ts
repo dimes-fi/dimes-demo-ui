@@ -4,6 +4,9 @@ export type {
   MarketLeverage,
   MarketFees,
   MarketPrices,
+  MarketSidedEligibility,
+  MarketMaxLeveragePerNotional,
+  MarketSidedMaxLeveragePerNotional,
   OriginationTier,
   Offer,
   OpenPosition,
@@ -21,10 +24,22 @@ export type {
   PositionUnwindList,
   ContractInfo,
   CreateOfferParams,
+  SideEligibility,
+  SidedEligibility,
+  OriginationFeeBreakdown,
 } from '@dimes-dot-fi/sdk';
 
 export {
   isOpenPosition,
   isClosedPosition,
   leverageMaxBps,
+  getSidedEligibility,
+  defaultSide,
+  isFullyOpen,
+  isFullyClosed,
+  rejectionReasonText,
+  rejectionReasonShort,
+  maxLeverageBpsAtNotional,
+  maxViableLeverageBpsForCollateral,
+  getOriginationFeeBreakdown,
 } from '@dimes-dot-fi/sdk';

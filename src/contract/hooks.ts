@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -7,7 +7,7 @@ import {
   useAccount,
   useChainId,
 } from 'wagmi';
-import { parseGwei, getAddress } from 'viem';
+import { parseGwei, getAddress, type PublicClient, type TransactionReceipt } from 'viem';
 import { vaultAbi, erc20Abi } from './abi';
 import {
   recoverCreatePositionSigner,
@@ -18,9 +18,6 @@ import type { Offer } from '../api/types';
 
 const POLYGON_AMOY_CHAIN_ID = 80002;
 
-// Wallet gas estimation on Polygon Amoy is unreliable — it frequently
-// underestimates and causes replaced/dropped transactions. We override with
-// generous explicit values on testnet only; on mainnet we let the wallet estimate.
 const AMOY_GAS_OVERRIDES = {
   gas: 500_000n,
   maxPriorityFeePerGas: parseGwei('30'),
@@ -35,16 +32,65 @@ function useGasOverrides() {
 export const USDC_ADDRESS = ((import.meta.env.VITE_USDC_ADDRESS as string | undefined) ??
   '0xD477EDbe627E94639d7E92119Ca62a461c6ce555') as `0x${string}`;
 
+async function diagnoseRevert(
+  publicClient: PublicClient,
+  receipt: TransactionReceipt,
+  signatureExpirySec?: bigint,
+): Promise<Error> {
+  if (signatureExpirySec !== undefined) {
+    try {
+      const block = await publicClient.getBlock({ blockNumber: receipt.blockNumber });
+      if (block.timestamp > signatureExpirySec) {
+        return new Error('Quote expired before the transaction was mined. Refresh and try again.');
+      }
+    } catch {
+      // fall through to generic message
+    }
+  }
+  return new Error('Transaction reverted on-chain.');
+}
+
+function useRevertError(
+  receipt: TransactionReceipt | undefined,
+  signatureExpirySec?: bigint,
+): Error | null {
+  const publicClient = usePublicClient();
+  const [revertError, setRevertError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (!receipt || !publicClient) {
+      setRevertError(null);
+      return;
+    }
+    if (receipt.status !== 'reverted') {
+      setRevertError(null);
+      return;
+    }
+    let cancelled = false;
+    void diagnoseRevert(publicClient, receipt, signatureExpirySec).then((err) => {
+      if (!cancelled) setRevertError(err);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [receipt, publicClient, signatureExpirySec]);
+
+  return revertError;
+}
+
 export function useApproveUsdc() {
   const { writeContract, data: hash, isPending, error, reset: resetWrite } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess, error: receiptError } = useWaitForTransactionReceipt({
-    hash,
-    pollingInterval: 2_000,
-  });
+  const {
+    data: receipt,
+    isLoading: isConfirming,
+    isSuccess: receiptFetched,
+    error: receiptFetchError,
+  } = useWaitForTransactionReceipt({ hash, pollingInterval: 2_000 });
   const publicClient = usePublicClient();
   const { address: account } = useAccount();
   const gasOverrides = useGasOverrides();
   const [simulateError, setSimulateError] = useState<unknown>(null);
+  const revertError = useRevertError(receipt);
 
   const reset = () => {
     setSimulateError(null);
@@ -70,6 +116,9 @@ export function useApproveUsdc() {
     writeContract({ ...params, ...gasOverrides });
   };
 
+  const isSuccess = receiptFetched && receipt?.status === 'success';
+  const receiptError = receiptFetchError ?? revertError;
+
   return { approve, hash, isPending, isConfirming, isSuccess, error, receiptError, simulateError, reset };
 }
 
@@ -91,24 +140,28 @@ export function useCheckAllowance(
 export function useCreatePosition() {
   const { writeContract, data: hash, isPending, error, reset: resetWrite } = useWriteContract();
   const {
+    data: receipt,
     isLoading: isConfirming,
-    isSuccess,
-    isError: isReceiptError,
-    error: receiptError,
+    isSuccess: receiptFetched,
+    error: receiptFetchError,
   } = useWaitForTransactionReceipt({ hash, pollingInterval: 2_000 });
   const publicClient = usePublicClient();
   const { address: account } = useAccount();
   const { data: contractInfo } = useContractInfo();
   const gasOverrides = useGasOverrides();
   const [verifyError, setVerifyError] = useState<unknown>(null);
+  const [submittedExpiry, setSubmittedExpiry] = useState<bigint | undefined>(undefined);
+  const revertError = useRevertError(receipt, submittedExpiry);
 
   const reset = () => {
     setVerifyError(null);
+    setSubmittedExpiry(undefined);
     resetWrite();
   };
 
   const create = async (offer: Offer) => {
     setVerifyError(null);
+    setSubmittedExpiry(undefined);
 
     if (!account) {
       setVerifyError(new Error('Wallet not connected.'));
@@ -165,8 +218,13 @@ export function useCreatePosition() {
       return;
     }
 
+    setSubmittedExpiry(BigInt(offer.signatureExpiry));
     writeContract({ ...params, ...gasOverrides });
   };
+
+  const isSuccess = receiptFetched && receipt?.status === 'success';
+  const receiptError = receiptFetchError ?? revertError;
+  const isReceiptError = receiptError != null;
 
   return {
     create,
@@ -184,14 +242,17 @@ export function useCreatePosition() {
 
 export function useRequestClose() {
   const { writeContract, data: hash, isPending, error, reset: resetWrite } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess, error: receiptError } = useWaitForTransactionReceipt({
-    hash,
-    pollingInterval: 2_000,
-  });
+  const {
+    data: receipt,
+    isLoading: isConfirming,
+    isSuccess: receiptFetched,
+    error: receiptFetchError,
+  } = useWaitForTransactionReceipt({ hash, pollingInterval: 2_000 });
   const publicClient = usePublicClient();
   const { address: account } = useAccount();
   const gasOverrides = useGasOverrides();
   const [simulateError, setSimulateError] = useState<unknown>(null);
+  const revertError = useRevertError(receipt);
 
   const reset = () => {
     setSimulateError(null);
@@ -216,6 +277,9 @@ export function useRequestClose() {
 
     writeContract({ ...params, ...gasOverrides });
   };
+
+  const isSuccess = receiptFetched && receipt?.status === 'success';
+  const receiptError = receiptFetchError ?? revertError;
 
   return { requestClose, hash, isPending, isConfirming, isSuccess, error, receiptError, simulateError, reset };
 }

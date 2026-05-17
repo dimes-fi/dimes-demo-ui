@@ -73,7 +73,7 @@ function getClient(): DimesClient {
   const jwt = useAuthStore.getState().jwt;
   return new DimesClient({
     baseUrl: import.meta.env.VITE_API_URL || 'https://api-sandbox.dimes.fi',
-    auth: { getHeaders: async () => jwt ? { Authorization: `Bearer ${jwt}` } : ({}) },
+    auth: { getHeaders: async (): Promise<Record<string, string>> => jwt ? { Authorization: `Bearer ${jwt}` } : {} },
   });
 }
 

@@ -2,7 +2,13 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAccount, useBalance } from 'wagmi'
 import type { Market, MarketLeverage } from '../api/types'
-import { leverageMaxBps } from '../api/types'
+import {
+  leverageMaxBps,
+  maxViableLeverageBpsForCollateral,
+  getSidedEligibility,
+  defaultSide,
+  rejectionReasonText,
+} from '../api/types'
 import { useTradeMachine, buildQuoteParams } from '../hooks/useTradeMachine'
 import { useValueTween } from '../hooks/useValueTween'
 import { usePendingPositionsStore } from '../store/pendingPositions'
@@ -49,7 +55,10 @@ export function TradePanel({
   market: Market
   onClose: () => void
 }) {
-  const [side, setSide] = useState<'yes' | 'no'>('yes')
+  const eligibility = useMemo(() => getSidedEligibility(market), [market])
+  const initialSide = defaultSide(eligibility) ?? 'yes'
+  const [side, setSide] = useState<'yes' | 'no'>(initialSide)
+  const sideEligibility = eligibility[side]
   const [collateralUsd, setCollateralUsd] = useState('')
   const [leverageBps, setLeverageBps] = useState(() =>
     clampLeverageToMarket(DEFAULT_LEVERAGE_BPS, market, side),
@@ -57,7 +66,18 @@ export function TradePanel({
   const [showTicker, setShowTicker] = useState(false)
 
   const sideMaxBps = leverageMaxBps(market.leverage, side)
-  const maxViableLev = useMemo(() => maxViableLeverageBps(market, side), [market, side])
+  const capacityViableLev = useMemo(() => maxViableLeverageBps(market, side), [market, side])
+  const collateralNum = Number(collateralUsd) || 0
+  const notionalViableLev = useMemo(
+    () => (collateralNum > 0 ? maxViableLeverageBpsForCollateral(market, side, collateralNum) : null),
+    [market, side, collateralNum],
+  )
+  const maxViableLev = useMemo(() => {
+    const candidates = [capacityViableLev, notionalViableLev].filter(
+      (v): v is number => v != null,
+    )
+    return candidates.length > 0 ? Math.min(...candidates) : null
+  }, [capacityViableLev, notionalViableLev])
 
   useEffect(() => {
     setLeverageBps(clampLeverageToMarket(DEFAULT_LEVERAGE_BPS, market, side))
@@ -437,9 +457,10 @@ export function TradePanel({
         >
           <SideButton
             label="YES"
-            sub={market.prices ? formatCents(market.prices.yesBidPriceUsd) : market.yesSubTitle}
+            sub={market.prices ? formatCents(market.prices.yesBidPriceUsd) : (market.yesSubTitle ?? null)}
             variant="yes"
             active={side === 'yes'}
+            disabled={!eligibility.yes.open}
             onClick={() => { setSide('yes'); clearOffer(); }}
           />
           <SideButton
@@ -447,9 +468,20 @@ export function TradePanel({
             sub={market.prices ? formatCents(market.prices.noBidPriceUsd) : null}
             variant="no"
             active={side === 'no'}
+            disabled={!eligibility.no.open}
             onClick={() => { setSide('no'); clearOffer(); }}
           />
         </div>
+
+        {!sideEligibility.open ? (
+          <SideUnavailablePanel
+            side={side}
+            reasonCode={sideEligibility.reasonCode}
+            otherOpen={eligibility[side === 'yes' ? 'no' : 'yes'].open}
+            onSwitch={() => { setSide(side === 'yes' ? 'no' : 'yes'); clearOffer(); }}
+          />
+        ) : (<>
+
 
         {/* Collateral */}
         <div style={{ marginBottom: 18 }}>
@@ -515,6 +547,19 @@ export function TradePanel({
             />
           )}
         </div>
+
+        {notionalViableLev != null && leverageBps > notionalViableLev && (
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 11,
+              color: '#F5A623',
+              fontWeight: 500,
+            }}
+          >
+            ⚠ At ${(collateralNum * (leverageBps / 10000)).toFixed(2)} notional, max leverage is ~{(notionalViableLev / 10000).toFixed(notionalViableLev % 10000 === 0 ? 0 : 1)}×
+          </div>
+        )}
 
         <CapacityGuide
           market={market}
@@ -735,8 +780,57 @@ export function TradePanel({
           )
         )}
 
+        </>)}
+
       </div>
     </CardShell>
+  )
+}
+
+function SideUnavailablePanel({
+  side,
+  reasonCode,
+  otherOpen,
+  onSwitch,
+}: {
+  side: 'yes' | 'no'
+  reasonCode: string | null
+  otherOpen: boolean
+  onSwitch: () => void
+}) {
+  const otherLabel = side === 'yes' ? 'NO' : 'YES'
+  return (
+    <div
+      style={{
+        marginTop: 4,
+        marginBottom: 4,
+        padding: '16px 18px',
+        background: 'rgba(255,107,107,0.04)',
+        border: '1px solid rgba(255,107,107,0.2)',
+        borderRadius: 'var(--radius)',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: '#FF6B6B',
+          marginBottom: 6,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}
+      >
+        {side.toUpperCase()} side unavailable
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: otherOpen ? 12 : 0 }}>
+        {rejectionReasonText(reasonCode)}
+      </div>
+      {otherOpen && (
+        <Button variant="ghost" onClick={onSwitch}>
+          Switch to {otherLabel}
+        </Button>
+      )}
+    </div>
   )
 }
 
@@ -745,12 +839,14 @@ function SideButton({
   sub,
   variant,
   active,
+  disabled,
   onClick,
 }: {
   label: string
   sub: string | null
   variant: 'yes' | 'no'
   active: boolean
+  disabled?: boolean
   onClick: () => void
 }) {
   const isYes = variant === 'yes'
@@ -775,7 +871,8 @@ function SideButton({
         color: active ? accent : 'var(--text-muted)',
         cursor: 'pointer',
         fontFamily: 'var(--font)',
-        transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
+        opacity: disabled && !active ? 0.4 : 1,
+        transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease',
       }}
     >
       <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.04em' }}>{label}</span>

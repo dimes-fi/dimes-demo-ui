@@ -21,7 +21,7 @@ function buildChartPoints(unwindList: PositionUnwindList, endAt?: Date): {
       leverageBps: unwindList.originationLeverageBps,
       isUnwindEvent: false,
     })
-  } else {
+  } else if (unwindList.originationLeverageBps > 0) {
     // Not yet opened — synthesize a flat line at origination leverage
     points.push({
       date: new Date(terminalDate.getTime() - 60 * 60 * 1000),
@@ -39,7 +39,11 @@ function buildChartPoints(unwindList: PositionUnwindList, endAt?: Date): {
   }
 
   const lastPoint = points[points.length - 1]
-  if (!lastPoint || lastPoint.date < terminalDate) {
+  if (
+    unwindList.currentLeverageBps != null &&
+    unwindList.currentLeverageBps > 0 &&
+    (!lastPoint || lastPoint.date < terminalDate)
+  ) {
     points.push({
       date: terminalDate,
       leverageBps: unwindList.currentLeverageBps,

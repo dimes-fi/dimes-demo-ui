@@ -3,13 +3,16 @@ export function StatRow({
   value,
   valueColor,
   previousValue,
+  nested,
 }: {
   label: string
   value: string
   valueColor?: string
   previousValue?: string
+  nested?: boolean
 }) {
   const changed = previousValue !== undefined && previousValue !== value
+  const basePadLeft = nested ? 16 : 0
 
   return (
     <div
@@ -19,12 +22,12 @@ export function StatRow({
         gap: 8,
         padding: '6px 0',
         borderLeft: changed ? '2px solid #F5A623' : '2px solid transparent',
-        paddingLeft: changed ? 8 : 0,
+        paddingLeft: changed ? basePadLeft + 8 : basePadLeft,
         transition: 'border-color 0.4s ease, padding-left 0.4s ease',
       }}
     >
-      <span style={{ color: 'var(--text-muted)', fontSize: 13, whiteSpace: 'nowrap' }}>
-        {label}
+      <span style={{ color: nested ? 'var(--text-dim)' : 'var(--text-muted)', fontSize: nested ? 12 : 13, whiteSpace: 'nowrap' }}>
+        {nested ? `↳ ${label}` : label}
       </span>
       <div
         style={{

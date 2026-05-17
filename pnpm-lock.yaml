@@ -12,8 +12,8 @@ importers:
   .:
     dependencies:
       '@dimes-dot-fi/sdk':
-        specifier: file:/Users/alexemery/bl/dimes-sdk
-        version: file:../dimes-sdk(@tanstack/react-query@5.100.9(react@19.2.6))(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@5.0.10)(viem@2.48.8(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
+        specifier: 1.2.0
+        version: 1.2.0(@tanstack/react-query@5.100.9(react@19.2.6))(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@5.0.10)(viem@2.48.8(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
       '@rainbow-me/rainbowkit':
         specifier: ^2.2.10
         version: 2.2.11(@tanstack/react-query@5.100.9(react@19.2.6))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(viem@2.48.8(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))(wagmi@2.19.5(@tanstack/query-core@5.100.9)(@tanstack/react-query@5.100.9(react@19.2.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(typescript@5.9.3)(utf-8-validate@5.0.10)(viem@2.48.8(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))(zod@4.4.3))
@@ -161,8 +161,8 @@ packages:
   '@coinbase/wallet-sdk@4.3.6':
     resolution: {integrity: sha512-4q8BNG1ViL4mSAAvPAtpwlOs1gpC+67eQtgIwNvT3xyeyFFd+guwkc8bcX5rTmQhXpqnhzC4f0obACbP9CqMSA==}
 
-  '@dimes-dot-fi/sdk@file:../dimes-sdk':
-    resolution: {directory: ../dimes-sdk, type: directory}
+  '@dimes-dot-fi/sdk@1.2.0':
+    resolution: {integrity: sha512-VEopjOfaUb254VlS31ZRXfgFTXKJspZpU38572nkRn6ZviJgxek9wNgwiTGQewzVxdIXZNq//KZQO2KPwbiGQg==}
     peerDependencies:
       '@tanstack/react-query': '>=5'
       react: '>=19'
@@ -3206,7 +3206,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@dimes-dot-fi/sdk@file:../dimes-sdk(@tanstack/react-query@5.100.9(react@19.2.6))(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@5.0.10)(viem@2.48.8(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))':
+  '@dimes-dot-fi/sdk@1.2.0(@tanstack/react-query@5.100.9(react@19.2.6))(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@5.0.10)(viem@2.48.8(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))':
     dependencies:
       humps: 2.0.1
       socket.io-client: 4.8.3(bufferutil@4.1.0)(utf-8-validate@5.0.10)
