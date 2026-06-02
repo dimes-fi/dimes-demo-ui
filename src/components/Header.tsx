@@ -3,8 +3,10 @@ import { useDisconnect, useAccount, useBalance } from 'wagmi'
 import { useAuthStore } from '../store/auth'
 import { isDemoMode } from '../api/auth'
 import { useDepositWallet } from '../contract/useDepositWallet'
+import { useDisplayWallet, setDisplayWallet } from '../hooks/useDisplayWallet'
 
 function CompactConnectButton() {
+  const displayWallet = useDisplayWallet()
   const baseBtn: React.CSSProperties = {
     padding: '6px 12px',
     fontSize: 12,
@@ -92,7 +94,7 @@ function CompactConnectButton() {
                     type="button"
                     style={baseBtn}
                   >
-                    {account.displayName}
+                    {displayWallet ? shortenAddress(displayWallet) : account.displayName}
                   </button>
                 </>
               )
@@ -270,6 +272,44 @@ function DepositWalletToggle() {
   )
 }
 
+/**
+ * Subtle, demo-only control to override the wallet shown in the header connect
+ * button. Renders as a tiny low-contrast dot; click to set/clear a display
+ * address. Cosmetic only — see useDisplayWallet.
+ */
+function DisplayWalletDot() {
+  const displayWallet = useDisplayWallet()
+
+  const handleClick = () => {
+    const next = window.prompt(
+      'Display wallet (cosmetic only — leave blank to clear):',
+      displayWallet ?? '',
+    )
+    if (next === null) return
+    setDisplayWallet(next)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      title="Set display wallet (demo)"
+      aria-label="Set display wallet"
+      style={{
+        width: 8,
+        height: 8,
+        padding: 0,
+        borderRadius: '50%',
+        border: 'none',
+        cursor: 'pointer',
+        background: displayWallet ? 'var(--yellow)' : 'var(--border)',
+        opacity: displayWallet ? 0.9 : 0.35,
+        transition: 'opacity 0.15s ease',
+      }}
+    />
+  )
+}
+
 function DimesLogo() {
   return (
     <img
@@ -304,6 +344,7 @@ export function Header() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <DimesLogo />
         {isDemoMode && <DemoBadge />}
+        <DisplayWalletDot />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         {isConnected && <DepositWalletToggle />}

@@ -1,35 +1,20 @@
-import { create } from 'zustand';
-
 /**
- * Polymarket builder API credentials, entered by the user for the local-demo
- * direct-relayer flow. Held in memory ONLY — never persisted to localStorage
- * and never sent to the Dimes backend. Cleared on page refresh.
+ * Polymarket builder API credentials for the local-demo direct-relayer flow.
+ *
+ * Sourced from env config ONLY (VITE_BUILDER_API_KEY / _SECRET / _PASSPHRASE) —
+ * there is intentionally no UI to enter them. When all three are present, the
+ * push-funded batch is submitted straight to the relayer from the browser,
+ * bypassing the partner-API-key-guarded backend endpoint.
  */
-interface BuilderCredsState {
-  apiKey: string;
-  apiSecret: string;
-  apiPassphrase: string;
-  /** True only when all three fields are populated. */
-  hasCreds: boolean;
-  setCreds: (apiKey: string, apiSecret: string, apiPassphrase: string) => void;
-  clearCreds: () => void;
-}
+import type { BuilderCreds } from '../api/relayer';
 
-export const useBuilderCredsStore = create<BuilderCredsState>((set) => ({
-  apiKey: '',
-  apiSecret: '',
-  apiPassphrase: '',
-  hasCreds: false,
-  setCreds: (apiKey, apiSecret, apiPassphrase) => {
-    const trimmedKey = apiKey.trim();
-    const trimmedSecret = apiSecret.trim();
-    const trimmedPassphrase = apiPassphrase.trim();
-    set({
-      apiKey: trimmedKey,
-      apiSecret: trimmedSecret,
-      apiPassphrase: trimmedPassphrase,
-      hasCreds: Boolean(trimmedKey && trimmedSecret && trimmedPassphrase),
-    });
-  },
-  clearCreds: () => set({ apiKey: '', apiSecret: '', apiPassphrase: '', hasCreds: false }),
-}));
+const apiKey = (import.meta.env.VITE_BUILDER_API_KEY as string | undefined)?.trim() ?? '';
+const apiSecret = (import.meta.env.VITE_BUILDER_API_SECRET as string | undefined)?.trim() ?? '';
+const apiPassphrase = (import.meta.env.VITE_BUILDER_API_PASSPHRASE as string | undefined)?.trim() ?? '';
+
+/** True only when all three creds are configured via env. */
+export const hasBuilderCreds = Boolean(apiKey && apiSecret && apiPassphrase);
+
+export function getBuilderCreds(): BuilderCreds {
+  return { apiKey, apiSecret, apiPassphrase };
+}

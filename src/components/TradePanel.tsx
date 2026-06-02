@@ -23,16 +23,25 @@ import { useAuthStore } from '../store/auth'
 import { isDemoMode } from '../api/auth'
 import { quoteErrorHint, hintAdjustment, type CorrectedField } from '../api/quote-error-hints'
 import { maxViableLeverageBps } from '../utils/capacity'
-import { BuilderCredsPanel } from './BuilderCredsPanel'
 import { CapacityGuide } from './CapacityGuide'
 import { CardShell } from './CardShell'
 import { ErrorBanner } from './ErrorBanner'
+import { formatApiError } from '../api/error-messages'
+import { formatContractError } from '../contract/error-messages'
+import { useToastStore } from '../store/toasts'
 import { LeverageSlider } from './LeverageSlider'
 import { QuoteDetails } from './QuoteDetails'
 import { QuoteErrorHint } from './QuoteErrorHint'
 import { Button } from './ui/Button'
 import { Field } from './ui/Field'
 import { Input } from './ui/Input'
+
+function formatCreateError(error: unknown): string {
+  if (error != null && typeof error === 'object' && 'status' in error && 'code' in error) {
+    return formatApiError(error)
+  }
+  return formatContractError(error).message
+}
 
 const PRESET_AMOUNTS = [50, 100, 500] as const
 const DEFAULT_SLIPPAGE_BPS = 800 // 8%
@@ -180,11 +189,27 @@ export function TradePanel({
     }
   }, [stubKey, createWriteError, verifyError, createReceiptError, removePendingStub])
 
+  const addToast = useToastStore((s) => s.add)
+  const toastedErrorRef = useRef<unknown>(null)
   useEffect(() => {
-    if (verifyError || createWriteError || createReceiptError) {
+    const err = verifyError ?? createWriteError ?? createReceiptErrorObj
+    if (err) {
+      // clearOffer() resets the drawer to its initial state, hiding the inline
+      // banner — so always surface the failure as a toast as well.
+      if (toastedErrorRef.current !== err) {
+        toastedErrorRef.current = err
+        addToast({
+          title: 'Failed to create position',
+          description: formatCreateError(err),
+          variant: 'error',
+          durationMs: 6000,
+        })
+      }
       clearOffer()
+    } else {
+      toastedErrorRef.current = null
     }
-  }, [verifyError, createWriteError, createReceiptError, clearOffer])
+  }, [verifyError, createWriteError, createReceiptError, createReceiptErrorObj, clearOffer, addToast])
 
   const [isOfferExpired, setIsOfferExpired] = useState(false)
   useEffect(() => {
@@ -642,8 +667,6 @@ export function TradePanel({
             </div>
           </div>
         </div>
-
-        {depositWalletMode && <BuilderCredsPanel />}
 
         {/* Get quote */}
         <div style={{ marginTop: 18, position: 'relative' }}>

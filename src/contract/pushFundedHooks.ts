@@ -10,7 +10,7 @@ import {
 import { submitRelayerBatch, submitRelayerBatchDirect } from '../api/relayer';
 import { useContractInfo } from '../hooks/useContractInfo';
 import { useAuthStore } from '../store/auth';
-import { useBuilderCredsStore } from '../store/builderCreds';
+import { getBuilderCreds, hasBuilderCreds } from '../store/builderCreds';
 import type { Offer } from '../api/types';
 import { USDC_ADDRESS } from './hooks';
 import { recoverCreatePositionSigner, resolveExpectedSigner } from './verifySignature';
@@ -141,18 +141,12 @@ function usePushFundedBatch() {
       signature,
     };
 
-    // Local-demo path: when the user has supplied Polymarket builder
-    // credentials, submit straight to the relayer from the browser instead
-    // of routing through the partner-API-key-guarded backend endpoint.
-    const builderCreds = useBuilderCredsStore.getState();
-
+    // Local-demo path: when Polymarket builder credentials are configured via
+    // env (VITE_BUILDER_API_*), submit straight to the relayer from the browser
+    // instead of routing through the partner-API-key-guarded backend endpoint.
     try {
-      const result = builderCreds.hasCreds
-        ? await submitRelayerBatchDirect(relayerParams, {
-            apiKey: builderCreds.apiKey,
-            apiSecret: builderCreds.apiSecret,
-            apiPassphrase: builderCreds.apiPassphrase,
-          })
+      const result = hasBuilderCreds
+        ? await submitRelayerBatchDirect(relayerParams, getBuilderCreds())
         : await submitRelayerBatch(relayerParams);
       setState({ ...initialState, isSuccess: true, transactionHash: result.transactionHash });
     } catch (e) {

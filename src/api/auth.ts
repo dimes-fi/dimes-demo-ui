@@ -60,11 +60,14 @@ export async function requestAuthToken(connectedWallet?: string): Promise<TokenR
     );
   }
 
+  // Normally hardcoded to the demo wallet, but honor an explicit override so the
+  // demo-only display-wallet switch can scope the token to another wallet when
+  // the sandbox allows it.
   return apiFetchPublic<TokenResponse>(
     '/v1/prediction-markets/demo-token',
     {
       method: 'POST',
-      body: JSON.stringify({ wallet_address: DEMO_WALLET_ADDRESS }),
+      body: JSON.stringify({ wallet_address: connectedWallet ?? DEMO_WALLET_ADDRESS }),
     },
     TOKEN_BASE_URL,
   );

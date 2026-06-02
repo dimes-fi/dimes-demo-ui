@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { useAuthStore } from '../store/auth';
 import { DEMO_WALLET_ADDRESS, isDemoMode, requestAuthToken } from '../api/auth';
+import { useDisplayWallet } from './useDisplayWallet';
 
 const REFRESH_BUFFER_MS = 60_000;
 
@@ -18,17 +19,24 @@ export function useAutoAuth() {
   const { setAuth, clearAuth } = useAuthStore();
   const depositWalletMode = useAuthStore((s) => s.depositWalletMode);
   const depositWalletAddress = useAuthStore((s) => s.depositWalletAddress);
+  const displayWallet = useDisplayWallet();
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     // In deposit-wallet mode the JWT and quotes must be scoped to the deposit
     // wallet contract (the on-chain `msg.sender`), not the connected owner EOA.
     const connectedAddress = isConnected && address ? address : undefined;
-    const effectiveAddress = isDemoMode
-      ? DEMO_WALLET_ADDRESS
-      : depositWalletMode && depositWalletAddress
-        ? depositWalletAddress
-        : connectedAddress;
+    // Demo-only override: when a display wallet is set, mint the JWT for it so
+    // positions/quotes/socket all follow it. Takes precedence over everything.
+    // NOTE: in pure demo-token mode the sandbox endpoint is hardcoded to the
+    // demo wallet and ignores this — it only takes effect on the /tokens path.
+    const effectiveAddress = displayWallet
+      ? displayWallet
+      : isDemoMode
+        ? DEMO_WALLET_ADDRESS
+        : depositWalletMode && depositWalletAddress
+          ? depositWalletAddress
+          : connectedAddress;
 
     function clearTimer() {
       if (refreshTimer.current) {
@@ -64,5 +72,5 @@ export function useAutoAuth() {
     }
 
     return clearTimer;
-  }, [isConnected, address, depositWalletMode, depositWalletAddress, setAuth, clearAuth]);
+  }, [isConnected, address, depositWalletMode, depositWalletAddress, displayWallet, setAuth, clearAuth]);
 }
