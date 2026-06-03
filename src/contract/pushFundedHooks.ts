@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getAddress } from 'viem';
 import { useAccount, usePublicClient, useSignTypedData } from 'wagmi';
 import {
   buildDepositWalletBatch,
@@ -176,14 +177,26 @@ export function useCreatePositionPushFunded() {
       return;
     }
 
-    // The offer signature binds to the deposit wallet (the on-chain msg.sender).
+    // The offer signature binds to the deposit wallet (the on-chain msg.sender),
+    // so the offer must have been created for this deposit wallet.
+    if (getAddress(offer.authorityPublicKey) !== getAddress(depositWalletAddress as `0x${string}`)) {
+      setVerifyError(
+        new Error(
+          `Offer was created for ${getAddress(
+            offer.authorityPublicKey,
+          )}, not the active deposit wallet ${getAddress(depositWalletAddress as `0x${string}`)}.`,
+        ),
+      );
+      return;
+    }
+
     const expectedSigner = resolveExpectedSigner(contractInfo?.polygonSignerAddress);
     if (!expectedSigner) {
       setVerifyError(new Error('Unable to verify offer: no signer address from /contract-info.'));
       return;
     }
     try {
-      const recovered = await recoverCreatePositionSigner(offer, depositWalletAddress as `0x${string}`);
+      const recovered = await recoverCreatePositionSigner(offer);
       if (recovered.toLowerCase() !== expectedSigner.toLowerCase()) {
         setVerifyError(new Error(`Offer signature mismatch. Expected ${expectedSigner}.`));
         return;

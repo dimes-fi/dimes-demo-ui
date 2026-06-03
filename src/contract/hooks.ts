@@ -174,9 +174,22 @@ export function useCreatePosition() {
       return;
     }
 
+    // The contract binds the signed `user` to `msg.sender`, so the offer must
+    // have been created for the wallet that is now submitting it.
+    if (getAddress(account) !== getAddress(offer.authorityPublicKey)) {
+      setVerifyError(
+        new Error(
+          `Wrong wallet connected. This offer was created for ${getAddress(
+            offer.authorityPublicKey,
+          )} — connect that wallet to open the position.`,
+        ),
+      );
+      return;
+    }
+
     let recoveredSigner: `0x${string}`;
     try {
-      recoveredSigner = await recoverCreatePositionSigner(offer, account);
+      recoveredSigner = await recoverCreatePositionSigner(offer);
     } catch {
       setVerifyError(new Error('Failed to recover signer from offer signature.'));
       return;

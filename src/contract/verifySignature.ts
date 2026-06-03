@@ -20,7 +20,6 @@ const CREATE_POSITION_TYPES = {
 
 export async function recoverCreatePositionSigner(
   offer: Offer,
-  userAddress: `0x${string}`,
 ): Promise<`0x${string}`> {
   return recoverTypedDataAddress({
     domain: {
@@ -33,7 +32,7 @@ export async function recoverCreatePositionSigner(
     primaryType: 'CreatePosition',
     message: {
       positionSeed: offer.positionSeedHex as `0x${string}`,
-      user: userAddress,
+      user: getAddress(offer.authorityPublicKey),
       marketId: offer.polymarketMarketId as `0x${string}`,
       tokenId: BigInt(offer.polymarketTokenId),
       collateralUsdcUnits: BigInt(offer.collateralUsdcUnits),

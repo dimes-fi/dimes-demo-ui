@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useToastStore, type Toast } from '../store/toasts'
 
 const variantColors: Record<Toast['variant'], string> = {
@@ -17,12 +17,23 @@ const variantIcons: Record<Toast['variant'], string[]> = {
 
 function ToastItem({ toast }: { toast: Toast }) {
   const dismiss = useToastStore((s) => s.dismiss)
+  const [paused, setPaused] = useState(false)
+  const [copied, setCopied] = useState(false)
   useEffect(() => {
+    if (paused) return
     const timer = setTimeout(() => dismiss(toast.id), toast.durationMs)
     return () => clearTimeout(timer)
-  }, [toast.id, toast.durationMs, dismiss])
+  }, [toast.id, toast.durationMs, dismiss, paused])
 
   const accentColor = variantColors[toast.variant]
+
+  const copy = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const text = toast.description ? `${toast.title}\n${toast.description}` : toast.title
+    void navigator.clipboard?.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   return (
     <div
@@ -43,6 +54,8 @@ function ToastItem({ toast }: { toast: Toast }) {
         position: 'relative',
       }}
       onClick={() => dismiss(toast.id)}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
       role="alert"
     >
       <svg
@@ -79,15 +92,42 @@ function ToastItem({ toast }: { toast: Toast }) {
               color: 'var(--text-muted)',
               fontFamily: 'var(--font)',
               marginTop: 2,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
+              whiteSpace: 'pre-wrap',
+              overflowWrap: 'anywhere',
+              maxHeight: 240,
+              overflowY: 'auto',
             }}
           >
             {toast.description}
           </div>
         )}
       </div>
+      <button
+        type="button"
+        onClick={copy}
+        title={copied ? 'Copied' : 'Copy'}
+        style={{
+          flexShrink: 0,
+          background: 'none',
+          border: 'none',
+          padding: 2,
+          cursor: 'pointer',
+          color: copied ? accentColor : 'var(--text-muted)',
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {copied ? (
+            <path d="M20 6L9 17l-5-5" />
+          ) : (
+            <>
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </>
+          )}
+        </svg>
+      </button>
     </div>
   )
 }
