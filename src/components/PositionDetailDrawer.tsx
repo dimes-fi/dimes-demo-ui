@@ -663,6 +663,13 @@ const FAILURE_COPY: Record<string, string> = {
 const GENERIC_FAILURE_COPY =
   'Your position could not be opened and your collateral was returned.'
 
+const REVERT_REASON_COPY: Record<string, string> = {
+  exchange_unavailable:
+    'The prediction market (Polymarket) was temporarily unavailable, so your order could not be placed. Your collateral was returned — this is safe to retry.',
+  slippage_exceeded:
+    'The Polymarket price moved beyond your slippage tolerance before the order could fill. Your collateral was returned and no position was opened.',
+}
+
 const BULL_RETRY_PREFIX = 'Bull job max retries: '
 
 function describeFailureReason(code: string | null | undefined): string {
@@ -673,6 +680,16 @@ function describeFailureReason(code: string | null | undefined): string {
     if (cause) return `Execution failed after multiple retries: ${cause}.`
   }
   return GENERIC_FAILURE_COPY
+}
+
+function describeRevertReason(
+  revertReason: string | null | undefined,
+  rawFailureCode: string | null | undefined,
+): string {
+  if (revertReason && REVERT_REASON_COPY[revertReason]) {
+    return REVERT_REASON_COPY[revertReason]
+  }
+  return describeFailureReason(rawFailureCode)
 }
 
 function ClosedPositionDetail({
@@ -712,7 +729,7 @@ function ClosedPositionDetail({
   const rawFailureCode = position.failure?.reason ?? null
   const showFailureExplanation = isReverted
   const failureExplanation = showFailureExplanation
-    ? describeFailureReason(rawFailureCode)
+    ? describeRevertReason(position.revertReason, rawFailureCode)
     : null
 
   return (

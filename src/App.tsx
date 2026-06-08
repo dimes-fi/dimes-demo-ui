@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { useAutoAuth } from './hooks/useAutoAuth'
 import { usePositionSocket } from './hooks/usePositionSocket'
+import { useMarketSocket } from './hooks/useMarketSocket'
 import { useAuthStore } from './store/auth'
 import type { Market } from './api/types'
 import { Layout } from './components/Layout'
@@ -39,6 +40,7 @@ function App() {
   const { isConnected } = useAccount()
   useAutoAuth()
   usePositionSocket()
+  useMarketSocket()
   const jwt = useAuthStore((s) => s.jwt)
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   const [marketCount, setMarketCount] = useState<number | undefined>(undefined)
