@@ -15,7 +15,9 @@ export function QuoteErrorHint({ hint, adjustment, market, side, leverageBps }: 
   if (!hint) return null
 
   const isCapacityHint =
-    hint.kind === 'use-max-collateral' || hint.kind === 'market-full'
+    hint.kind === 'use-max-collateral' ||
+    hint.kind === 'market-full' ||
+    hint.kind === 'insufficient-liquidity'
 
   if (isCapacityHint && market && side && leverageBps) {
     return (
@@ -107,7 +109,8 @@ function CapacityErrorDetail({
   )
 
   const isMarketFull = hint?.kind === 'market-full'
-  const tone = isMarketFull ? 'red' as const : 'amber' as const
+  const isThinLiquidity = hint?.kind === 'insufficient-liquidity'
+  const tone = isMarketFull || isThinLiquidity ? 'red' as const : 'amber' as const
   const color = tone === 'amber' ? 'rgba(245, 196, 81, 0.92)' : '#F5A1A1'
   const dimColor = tone === 'amber' ? 'rgba(245, 196, 81, 0.55)' : 'rgba(245, 161, 161, 0.55)'
   const border = tone === 'amber' ? 'rgba(245, 196, 81, 0.22)' : 'rgba(224, 82, 82, 0.25)'
@@ -132,9 +135,11 @@ function CapacityErrorDetail({
       }}
     >
       <span style={{ fontWeight: 600 }}>
-        {isMarketFull
-          ? `${side.toUpperCase()} side is at capacity`
-          : `Position exceeds ${side.toUpperCase()} capacity`}
+        {isThinLiquidity
+          ? `Not enough liquidity on the ${side.toUpperCase()} side`
+          : isMarketFull
+            ? `${side.toUpperCase()} side is at capacity`
+            : `Position exceeds ${side.toUpperCase()} capacity`}
       </span>
 
       {bounds.isViable && bounds.maxCollateralUsd != null && (
@@ -151,8 +156,14 @@ function CapacityErrorDetail({
 
       {otherHasMore && (
         <span style={{ color: dimColor, fontSize: 12 }}>
-          The {otherSide.toUpperCase()} side has more capacity
+          The {otherSide.toUpperCase()} side has more {isThinLiquidity ? 'liquidity' : 'capacity'}
           {otherBounds.maxCollateralUsd != null ? ` (up to ${formatUsd(otherBounds.maxCollateralUsd)})` : ''}
+        </span>
+      )}
+
+      {isThinLiquidity && !otherHasMore && (
+        <span style={{ color: dimColor, fontSize: 12 }}>
+          The order book is too thin to open a position here right now
         </span>
       )}
 

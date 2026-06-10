@@ -7,6 +7,10 @@ import { useAuthStore } from './store/auth'
 import type { Market } from './api/types'
 import { Layout } from './components/Layout'
 import { ToastContainer } from './components/ToastContainer'
+import { DebugPanel } from './components/DebugPanel'
+import { installGlobalErrorCapture } from './utils/errorLog'
+
+installGlobalErrorCapture()
 import { Header } from './components/Header'
 import { Hero } from './components/Hero'
 import { MarketList } from './components/MarketList'
@@ -60,6 +64,7 @@ function App() {
   return (
     <Layout>
       <ToastContainer />
+      <DebugPanel />
       {isConnected && <Header />}
 
       <main style={{ padding: '24px 0' }}>
