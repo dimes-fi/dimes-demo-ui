@@ -1,7 +1,7 @@
 import { apiFetch, apiFetchList, apiFetchListWithPagination } from './client';
 import type { Market } from './types';
 
-export type MarketSort = 'ticker_asc' | 'depth_desc';
+export type MarketSort = 'ticker_asc' | 'depth_desc' | 'discovered_at_desc';
 
 export interface FetchMarketsParams {
   category?: string;

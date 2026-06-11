@@ -3,6 +3,7 @@ import { useAccount } from 'wagmi'
 import { useAutoAuth } from './hooks/useAutoAuth'
 import { usePositionSocket } from './hooks/usePositionSocket'
 import { useMarketSocket } from './hooks/useMarketSocket'
+import { useSeedLiveMarkets } from './hooks/useSeedLiveMarkets'
 import { useAuthStore } from './store/auth'
 import type { Market } from './api/types'
 import { Layout } from './components/Layout'
@@ -45,6 +46,7 @@ function App() {
   useAutoAuth()
   usePositionSocket()
   useMarketSocket()
+  useSeedLiveMarkets()
   const jwt = useAuthStore((s) => s.jwt)
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   const [marketCount, setMarketCount] = useState<number | undefined>(undefined)

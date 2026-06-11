@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useMarkets } from '../hooks/useMarkets'
+import { LiveMarketsStrip } from './LiveMarketsStrip'
+import { useFlashOnChange } from '../hooks/useFlashOnChange'
 import type { Market } from '../api/types'
 import {
   leverageMaxBps,
@@ -113,6 +115,11 @@ export function MarketList({
   const markets = page?.data
   const hasMore = page?.hasMore ?? false
   const hasPrev = cursorStack.length > 0
+
+  const visibleIds = useMemo(
+    () => new Set((markets ?? []).map((m) => m.id)),
+    [markets],
+  )
 
   useEffect(() => {
     onTotalCount?.(page?.totalCount)
@@ -230,6 +237,16 @@ export function MarketList({
         `}</style>
       </div>
 
+      <LiveMarketsStrip
+        category={category}
+        status={status}
+        acceptingNewPositions={acceptingNewPositions}
+        search={debouncedSearch || undefined}
+        visibleIds={visibleIds}
+        onSelect={onSelectMarket}
+        onMerge={refresh}
+      />
+
       {isLoading ? (
         <MarketListSkeleton />
       ) : !markets || markets.length === 0 ? (
@@ -318,7 +335,7 @@ export function MarketList({
 
 
 
-function MarketRow({
+export function MarketRow({
   market,
   onSelect,
   onCopy,
@@ -473,6 +490,7 @@ function SidePill({
   maxLevX: string
 }) {
   const label = side.toUpperCase()
+  const flashNonce = useFlashOnChange(maxLevX)
   if (eligibility.open) {
     return (
       <span
@@ -490,7 +508,23 @@ function SidePill({
           whiteSpace: 'nowrap',
         }}
       >
-        {label} {maxLevX}×
+        <style>{`
+          @keyframes cellFlash {
+            0% { background: var(--yellow-soft); box-shadow: 0 0 0 1px var(--yellow-border); }
+            100% { background: transparent; box-shadow: 0 0 0 1px transparent; }
+          }
+        `}</style>
+        {label}{' '}
+        <span
+          key={flashNonce}
+          style={{
+            padding: '0 1px',
+            fontVariantNumeric: 'tabular-nums',
+            animation: flashNonce > 0 ? 'cellFlash 0.6s ease-out' : undefined,
+          }}
+        >
+          {maxLevX}×
+        </span>
       </span>
     )
   }

@@ -51,6 +51,8 @@ export function QuoteErrorHint({ hint, adjustment, market, side, leverageBps }: 
       case 'slippage':
         text = `Raised slippage tolerance to ${adjustment.toLabel} — try again.`
         break
+      default:
+        return null
     }
   } else {
     tone = 'red'

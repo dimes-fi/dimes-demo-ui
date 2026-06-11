@@ -5,18 +5,9 @@ import type { MarketDelta, MarketEvent } from '@dimes-dot-fi/sdk/ws'
 import type { Market } from '../api/types'
 import type { MarketsPage } from './useMarkets'
 import { useAuthStore } from '../store/auth'
+import { useLiveMarketsStore } from '../store/liveMarkets'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api-sandbox.dimes.fi'
-
-function upsertMarket(page: MarketsPage, market: Market): MarketsPage {
-  const idx = page.data.findIndex((m) => m.id === market.id)
-  if (idx >= 0) {
-    const data = [...page.data]
-    data[idx] = market
-    return { ...page, data }
-  }
-  return { ...page, data: [market, ...page.data] }
-}
 
 function mergeDelta(page: MarketsPage, delta: MarketDelta): MarketsPage {
   const idx = page.data.findIndex((m) => m.id === delta.id)
@@ -35,12 +26,28 @@ export function useMarketSocket() {
 
   const handleEvent = useCallback(
     (event: MarketEvent) => {
+      // Newly-discovered markets do NOT belong in the paginated, server-sorted,
+      // server-filtered list cache — injecting them there pollutes filtered
+      // views with markets the REST query never returned. Route them to the
+      // live-additions store instead; the strip applies active filters itself.
+      if (event.type === 'market.discovered') {
+        // Queue every discovery — even ones not yet accepting quotes. The strip
+        // renders only the accepting ones, so a market stays hidden here until a
+        // later eligibility delta flips it (see applyDelta below).
+        useLiveMarketsStore.getState().add(event.data as Market[])
+        return
+      }
+      // Deltas (eligibility / max-leverage changes). Patch BOTH:
+      //  - the queued live market, so a discovered-but-not-accepting market
+      //    becomes visible in the strip the moment it starts accepting;
+      //  - the table cache, so rows already displayed update in place
+      //    (mergeDelta is a no-op for ids not present in the page).
+      const deltas = event.data as MarketDelta[]
+      const liveStore = useLiveMarketsStore.getState()
+      deltas.forEach((d) => liveStore.applyDelta(d))
       queryClient.setQueriesData<MarketsPage>({ queryKey: ['markets'] }, (old) => {
         if (!old) return old
-        if (event.type === 'market.discovered') {
-          return (event.data as Market[]).reduce(upsertMarket, old)
-        }
-        return (event.data as MarketDelta[]).reduce(mergeDelta, old)
+        return deltas.reduce(mergeDelta, old)
       })
     },
     [queryClient],

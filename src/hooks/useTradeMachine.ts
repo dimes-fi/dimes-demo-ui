@@ -78,7 +78,7 @@ function getClient(): DimesClient {
 }
 
 function isMarketMovedError(err: unknown): boolean {
-  if (err instanceof DimesApiError) return marketMovedCodes.has(err.code);
+  if (err instanceof DimesApiError) return marketMovedCodes.has((err as { code: string }).code);
   if (err && typeof err === 'object' && 'code' in err) {
     return marketMovedCodes.has((err as { code: string }).code);
   }

@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Layout } from './components/Layout'
+import { LiveMarketsStrip } from './components/LiveMarketsStrip'
+import { MarketRow } from './components/MarketList'
+import { useLiveMarketsStore } from './store/liveMarkets'
 import { CardShell } from './components/CardShell'
 import { HealthRing } from './components/HealthRing'
 import { LeverageSlider } from './components/LeverageSlider'
@@ -306,6 +309,137 @@ const mockClosedPosition: ClosedPosition = {
   },
 }
 
+const openElig = {
+  yes: { acceptingNewPositions: true, rejectionReasonCode: null },
+  no: { acceptingNewPositions: true, rejectionReasonCode: null },
+}
+const pendingElig = {
+  yes: { acceptingNewPositions: false, rejectionReasonCode: 'QUOTE_ENTRY_PRICE_OUT_OF_RANGE' },
+  no: { acceptingNewPositions: false, rejectionReasonCode: 'QUOTE_ENTRY_BID_DEPTH_TOO_LOW' },
+}
+
+const demoBtn: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  padding: '6px 12px',
+  background: 'var(--surface-subtle)',
+  color: 'var(--text)',
+  border: '1px solid var(--border-strong)',
+  cursor: 'pointer',
+}
+
+/**
+ * Drives the live store to demonstrate the discovery → queue → flip-to-accepting
+ * lifecycle (banner) and the cell-scoped flash on a websocket leverage update
+ * (table). The strip is rendered with acceptingNewPositions=true so a pending
+ * (not-yet-accepting) discovery stays hidden until it flips.
+ */
+function LiveDemo() {
+  const counter = useRef(0)
+  const pending = useRef<string[]>([])
+  const [rows, setRows] = useState<Market[]>([mockMarket, mockMarket2])
+
+  useEffect(() => {
+    useLiveMarketsStore.getState().clear()
+    useLiveMarketsStore.getState().add([
+      { ...mockMarket3, discoveredAt: new Date(Date.now() - 60_000).toISOString() } as Market,
+    ])
+    return () => useLiveMarketsStore.getState().clear()
+  }, [])
+
+  const discover = () => {
+    const n = ++counter.current
+    const id = `dm_live_${n}`
+    pending.current.push(id)
+    useLiveMarketsStore.getState().add([
+      {
+        ...mockMarket3,
+        id,
+        ticker: id,
+        title: `Pending market #${n} — flips soon`,
+        category: n % 2 ? 'crypto' : 'sport',
+        acceptingNewPositions: false,
+        sidedEligibility: pendingElig,
+        discoveredAt: new Date(Date.now() + n * 1000).toISOString(),
+      } as Market,
+    ])
+  }
+
+  const flip = () => {
+    const id = pending.current.shift()
+    if (!id) return
+    useLiveMarketsStore.getState().applyDelta({
+      id,
+      acceptingNewPositions: true,
+      sidedEligibility: openElig,
+    })
+  }
+
+  const bumpLeverage = () => {
+    setRows((rs) =>
+      rs.map((m, i) =>
+        i === 0
+          ? {
+              ...m,
+              leverage: {
+                ...m.leverage,
+                maxYesBps: ((m.leverage.maxYesBps + 5000 - 10000) % 90000) + 10000,
+              },
+            }
+          : m,
+      ),
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+      <LiveMarketsStrip
+        acceptingNewPositions={true}
+        visibleIds={new Set()}
+        onSelect={(m) => console.log('select', m.ticker)}
+        onMerge={() => console.log('merge')}
+      />
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button style={demoBtn} onClick={discover}>
+          Discover (pending — stays hidden)
+        </button>
+        <button style={demoBtn} onClick={flip}>
+          Flip oldest pending → accepting
+        </button>
+        <button style={demoBtn} onClick={bumpLeverage}>
+          Bump table YES leverage (cell flash)
+        </button>
+      </div>
+      <p style={{ color: '#555', fontSize: 11, margin: 0 }}>
+        Discover queues a not-accepting market (hidden). Flip applies an eligibility delta — it
+        pops into the banner with a glow. Bump changes a table row's YES leverage; only that
+        number flashes.
+      </p>
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginTop: 4 }}>
+        <colgroup>
+          <col style={{ width: 'auto' }} />
+          <col style={{ width: 90 }} />
+          <col style={{ width: 90 }} />
+          <col style={{ width: 240 }} />
+          <col style={{ width: 60 }} />
+        </colgroup>
+        <tbody>
+          {rows.map((m) => (
+            <MarketRow
+              key={m.id}
+              market={m}
+              onSelect={() => {}}
+              onCopy={() => {}}
+              isCopied={false}
+              isSelected={false}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default function Preview() {
   const [leverageBps, setLeverageBps] = useState(30000)
 
@@ -318,6 +452,12 @@ export default function Preview() {
         <p style={{ color: '#555', fontSize: 12, marginBottom: 32 }}>
           Component showcase with mock data
         </p>
+
+        {/* Live Markets Strip + animations */}
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: '#e8e8e8', marginBottom: 12 }}>Live Markets Strip & table flash</h2>
+        <div style={{ marginBottom: 40 }}>
+          <LiveDemo />
+        </div>
 
         {/* Markets Grid */}
         <h2 style={{ fontSize: 14, fontWeight: 600, color: '#e8e8e8', marginBottom: 12 }}>Markets</h2>
