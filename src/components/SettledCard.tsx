@@ -44,6 +44,13 @@ export function SettledCard({
   const entryNotional = parseFloat(position.entry.notionalUsd)
   const collateral = parseFloat(position.entry.collateralUsd)
 
+  // exit_notional_usd is additive in api#4847; not yet in prod or the SDK types.
+  // Read defensively so the card keeps working until the field ships.
+  const exitNotionalRaw = (position.result as { exitNotionalUsd?: string | null })
+    .exitNotionalUsd
+  const exitNotional =
+    exitNotionalRaw != null ? parseFloat(exitNotionalRaw) : null
+
   return (
     <CardShell
       variant="settled"
@@ -145,6 +152,12 @@ export function SettledCard({
             label="Entry notional"
             value={`$${entryNotional.toFixed(2)}`}
           />
+          {exitNotional != null && !Number.isNaN(exitNotional) && (
+            <MicroStat
+              label="Exit notional"
+              value={`$${exitNotional.toFixed(2)}`}
+            />
+          )}
           <MicroStat
             label="Collateral"
             value={`$${collateral.toFixed(2)}`}
