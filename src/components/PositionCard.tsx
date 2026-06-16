@@ -27,6 +27,7 @@ export function PositionCard({
   const isUnwindingPosition = position.status === 'unwinding'
   const isVoided = position.timing.isVoided && position.timing.isSettlementPending
   const isInFlight = isPendingPosition || isClosingPosition || isSettlingPosition || isUnwindingPosition
+  const deferredClose = position.closeAttempt
 
 
   const isYes = position.side === 'yes'
@@ -86,6 +87,29 @@ export function PositionCard({
             </svg>
             <span style={{ fontSize: 12, color: '#A78BFA', lineHeight: 1.4 }}>
               Market voided — settling at $0.50
+            </span>
+          </div>
+        )}
+
+        {deferredClose && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'rgba(167,139,250,0.06)',
+              border: '1px solid rgba(167,139,250,0.18)',
+              borderRadius: 0,
+              padding: '10px 12px',
+              marginBottom: 16,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span style={{ fontSize: 12, color: '#A78BFA', lineHeight: 1.4 }}>
+              Close deferred — market resolved before your shares could be sold; remaining tokens will be redeemed at settlement
             </span>
           </div>
         )}

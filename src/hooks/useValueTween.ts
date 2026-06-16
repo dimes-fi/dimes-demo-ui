@@ -19,6 +19,7 @@ export function useValueTween(
     if (lastNonce.current === nonce) return
     lastNonce.current = nonce
     if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- no animation needed, settle immediately
       setState({ value: to, active: false })
       return
     }

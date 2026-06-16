@@ -59,6 +59,7 @@ function useRevertError(
 
   useEffect(() => {
     if (!receipt || !publicClient) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear stale revert error when inputs reset
       setRevertError(null);
       return;
     }

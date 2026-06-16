@@ -91,6 +91,8 @@ export function TradePanel({
   }, [capacityViableLev, notionalViableLev])
 
   useEffect(() => {
+    // Reset leverage/header when the market or side changes underneath us.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- derived reset on market/side change
     setLeverageBps(clampLeverageToMarket(DEFAULT_LEVERAGE_BPS, market, side))
     setShowTicker(false)
   }, [market.ticker, market.leverage.minBps, market.leverage.maxBps, market.leverage.maxYesBps, market.leverage.maxNoBps, market.leverage.stepBps, side])
@@ -107,7 +109,10 @@ export function TradePanel({
     query: { enabled: !!address },
   })
 
-  const [isAutoCorrectingRef] = useState(() => ({ current: false }))
+  // Real state (not a ref): the render output below gates on it, so it must
+  // trigger a re-render when toggled. It's flipped from effects that sync the
+  // trade machine's phase, hence the scoped set-state-in-effect disables.
+  const [isAutoCorrecting, setIsAutoCorrecting] = useState(false)
   const [hasAutoRetriedRef] = useState(() => ({ current: false }))
   const { state: tradeState, getDraft, promote, correctAndPromote, acceptChanges, reset: resetTrade } = useTradeMachine()
 
@@ -130,7 +135,7 @@ export function TradePanel({
   const offerError = tradeState.phase === 'error' ? tradeState.error : null
   const isPromoting = tradeState.phase === 'promoting'
   const isMarketMoved = tradeState.phase === 'market-moved'
-  const isCorrecting = isPromoting && isAutoCorrectingRef.current
+  const isCorrecting = isPromoting && isAutoCorrecting
 
   const {
     approve,
@@ -213,6 +218,7 @@ export function TradePanel({
   const [isOfferExpired, setIsOfferExpired] = useState(false)
   useEffect(() => {
     if (!promotedOffer) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when no offer
       setIsOfferExpired(false)
       return
     }
@@ -228,7 +234,8 @@ export function TradePanel({
   const prevPromotedRef = useRef<string | null>(null)
   useEffect(() => {
     if (!promotedOffer) return
-    isAutoCorrectingRef.current = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync flag to a new promoted offer
+    setIsAutoCorrecting(false)
     if (prevPromotedRef.current === promotedOffer.id) return
     prevPromotedRef.current = promotedOffer.id
     if (promotedOffer.onChainPositionKey) {
@@ -301,7 +308,12 @@ export function TradePanel({
   const [errorPulseNonce, setErrorPulseNonce] = useState(0)
   const correctionNonceRef = useRef(0)
   const adjustmentRef = useRef(adjustment)
-  adjustmentRef.current = adjustment
+  // Keep the latest adjustment in a ref so the offer-error effect can read it
+  // without listing it as a dependency. Written in an effect (not during
+  // render) to satisfy react-hooks/refs.
+  useEffect(() => {
+    adjustmentRef.current = adjustment
+  })
 
   useEffect(() => {
     if (!offerError) return
@@ -310,13 +322,13 @@ export function TradePanel({
     const hasAdjustment = adj && Math.abs(adj.toValue - adj.fromValue) >= 1e-4
 
     if (!hasAdjustment || hasAutoRetriedRef.current) {
-      isAutoCorrectingRef.current = false
+      setIsAutoCorrecting(false)
       setErrorPulseNonce((n) => n + 1)
       return
     }
 
     hasAutoRetriedRef.current = true
-    isAutoCorrectingRef.current = true
+    setIsAutoCorrecting(true)
 
     let adjustedCollateral = Number(collateralUsd) || 0
     let adjustedLeverage = leverageBps
@@ -527,7 +539,7 @@ export function TradePanel({
                 placeholder="0.00"
                 leadingSlot="$"
               />
-              {correction?.field === 'collateral' && !isAutoCorrectingRef.current && (
+              {correction?.field === 'collateral' && !isAutoCorrecting && (
                 <span
                   key={`corr-coll-${correction.nonce}`}
                   className="correction-overlay"
@@ -571,7 +583,7 @@ export function TradePanel({
             onChange={(v) => { setLeverageBps(v); clearOffer(); }}
             maxViableStep={maxViableLev}
           />
-          {correction?.field === 'leverage' && !isAutoCorrectingRef.current && (
+          {correction?.field === 'leverage' && !isAutoCorrecting && (
             <span
               key={`corr-lev-${correction.nonce}`}
               className="correction-overlay"
@@ -636,7 +648,7 @@ export function TradePanel({
                       aria-label="Custom slippage percent"
                     />
                     <span className="adv__custom-suffix">%</span>
-                    {correction?.field === 'slippage' && !isAutoCorrectingRef.current && (
+                    {correction?.field === 'slippage' && !isAutoCorrecting && (
                       <span
                         key={`corr-slip-${correction.nonce}`}
                         className="correction-overlay"
@@ -682,7 +694,7 @@ export function TradePanel({
                 ? 'Get quote'
                 : 'Connect wallet to trade'}
           </Button>
-          {correction && !isAutoCorrectingRef.current && (
+          {correction && !isAutoCorrecting && (
             <span
               key={`cta-${correction.nonce}`}
               className="cta-breath"
@@ -691,8 +703,8 @@ export function TradePanel({
           )}
         </div>
 
-        {!offerHint && !isAutoCorrectingRef.current && <ErrorBanner error={offerError} onDismiss={clearOffer} />}
-        {!isAutoCorrectingRef.current && (
+        {!offerHint && !isAutoCorrecting && <ErrorBanner error={offerError} onDismiss={clearOffer} />}
+        {!isAutoCorrecting && (
           <QuoteErrorHint
             hint={offerHint}
             adjustment={adjustment}
