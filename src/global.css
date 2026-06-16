@@ -1,0 +1,795 @@
+@import url('https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&display=swap');
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+input,
+textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* ---------------------------------------------------------------------------
+   Shared layout primitives.
+   -------------------------------------------------------------------------- */
+
+.container {
+  width: 100%;
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--container-pad);
+}
+
+/* ---------------------------------------------------------------------------
+   Button primitives (see src/components/ui/Button.tsx).
+   -------------------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  line-height: 1;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--yellow);
+  color: var(--yellow-ink);
+  font-weight: 700;
+}
+
+.btn--primary:disabled {
+  background: #2a2a2a;
+  color: var(--text-dim);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--yellow);
+  border-color: var(--yellow-border);
+}
+
+.btn--ghost:disabled {
+  color: var(--text-dim);
+  border-color: var(--border);
+}
+
+.get-quote-btn.btn {
+  transition: background 0.35s ease, color 0.35s ease, border-color 0.35s ease;
+}
+
+.btn--side-yes {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.btn--side-yes.is-active {
+  background: var(--green-soft);
+  color: var(--green);
+  border-color: var(--green-border);
+}
+
+.btn--side-no {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.btn--side-no.is-active {
+  background: var(--red-soft);
+  color: var(--red);
+  border-color: var(--red-border);
+}
+
+.btn--chip {
+  padding: 8px 12px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+  border-color: var(--border);
+  border-radius: var(--radius);
+}
+
+.btn--chip:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+}
+
+.btn--full {
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+   Field primitives (see src/components/ui/Field.tsx & Input.tsx).
+   -------------------------------------------------------------------------- */
+
+.field {
+  display: block;
+}
+
+.field__label {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.input-row {
+  display: flex;
+  align-items: center;
+  background: var(--card-elevated);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 0 12px;
+}
+
+.input-row:focus-within {
+  border-color: var(--border-strong);
+}
+
+.input-row__prefix {
+  color: var(--text-dim);
+  font-size: var(--fs-base);
+  margin-right: 4px;
+}
+
+.input-row__suffix {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  background: var(--surface-subtle);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.input-row input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  padding: 12px 0;
+  min-width: 0;
+}
+
+.input-row input::placeholder {
+  color: var(--text-dim);
+}
+
+.input-row input[type='number']::-webkit-outer-spin-button,
+.input-row input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.input-row input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ---------------------------------------------------------------------------
+   Leverage card + quick preset buttons (multiply-demo aesthetic).
+   -------------------------------------------------------------------------- */
+
+.lev-wrap {
+  position: relative;
+  background: #0e0e0e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-top: 14px;
+  margin-bottom: 4px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    0 4px 18px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.lev-wrap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 80% at 50% 110%,
+    rgba(238, 255, 0, 0.18),
+    rgba(238, 255, 0, 0) 60%
+  );
+  pointer-events: none;
+}
+
+.lev-wrap::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(238, 255, 0, 0.4),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.lev-wrap > * {
+  position: relative;
+}
+
+.quick-btn-row {
+  display: flex;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.quick-btn {
+  flex: 1;
+  padding: 6px 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #1a1a1a;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+  font-variant-numeric: tabular-nums;
+}
+
+.quick-btn:hover:not(:disabled) {
+  background: rgba(238, 255, 0, 0.06);
+  border-color: rgba(238, 255, 0, 0.2);
+  color: var(--text);
+}
+
+.quick-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------------------
+   Advanced disclosure (see TradePanel.tsx).
+   -------------------------------------------------------------------------- */
+
+.adv {
+  --adv-ease: cubic-bezier(0.32, 0.72, 0.24, 1);
+  margin-top: 14px;
+}
+
+.adv__toggle {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 180ms var(--adv-ease);
+}
+
+.adv__toggle:hover,
+.adv__toggle[aria-expanded='true'] {
+  color: var(--text-muted);
+}
+
+.adv__caret {
+  width: 8px;
+  height: 8px;
+  position: relative;
+  transition: transform 260ms var(--adv-ease);
+}
+
+.adv__caret::before,
+.adv__caret::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 1.25px;
+  background: currentColor;
+  border-radius: 1px;
+  transform-origin: 1px 50%;
+  transition: transform 260ms var(--adv-ease);
+}
+
+.adv__caret::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.adv__caret::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.adv__toggle[aria-expanded='true'] .adv__caret::before {
+  transform: translate(-50%, -50%) rotate(135deg);
+}
+
+.adv__toggle[aria-expanded='true'] .adv__caret::after {
+  transform: translate(-50%, -50%) rotate(-135deg);
+}
+
+.adv__rule {
+  flex: 1;
+  height: 1px;
+  margin-left: 10px;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0)
+  );
+}
+
+.adv__toggle-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.adv__panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms var(--adv-ease);
+}
+
+.adv__panel--open {
+  grid-template-rows: 1fr;
+}
+
+.adv__panel-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.adv__panel-content {
+  padding-top: 12px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 240ms var(--adv-ease) 40ms,
+    transform 320ms var(--adv-ease) 40ms;
+}
+
+.adv__panel--open .adv__panel-content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.adv__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adv__label {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.adv__chips {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  gap: 2px;
+  margin-left: auto;
+}
+
+.adv__chip {
+  position: relative;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: calc(var(--radius) - 3px);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-dim);
+  transition: color 160ms var(--adv-ease), background 160ms var(--adv-ease);
+  font-variant-numeric: tabular-nums;
+}
+
+.adv__chip:hover:not(.adv__chip--active) {
+  color: var(--text);
+}
+
+.adv__chip--active {
+  background: var(--yellow);
+  color: var(--yellow-ink);
+}
+
+.adv__custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--card-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 10px 0 8px;
+  width: 86px;
+  transition: border-color 160ms var(--adv-ease);
+}
+
+.adv__custom:focus-within {
+  border-color: var(--yellow-border);
+}
+
+.adv__custom input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 7px 0;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.adv__custom input::-webkit-outer-spin-button,
+.adv__custom input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.adv__custom input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.adv__custom-suffix {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   Trade drawer — slides in from right, overlays content.
+   -------------------------------------------------------------------------- */
+
+.trade-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 280ms cubic-bezier(0.32, 0.72, 0.24, 1);
+}
+
+.trade-drawer-backdrop--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.trade-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 910;
+  width: 420px;
+  max-width: 100vw;
+  transform: translateX(100%);
+  transition: transform 320ms cubic-bezier(0.32, 0.72, 0.24, 1);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.5);
+}
+
+.trade-drawer--open {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.trade-drawer__inner {
+  flex: 1 1 0;
+  overflow-y: auto;
+  padding: 16px 0;
+}
+
+@media (max-width: 480px) {
+  .trade-drawer {
+    width: 100vw;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Markets toolbar (search + custom-styled dropdowns).
+   -------------------------------------------------------------------------- */
+
+.markets-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.markets-toolbar__input,
+.markets-toolbar__select,
+.markets-toolbar__refresh {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  font-family: var(--font);
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.markets-toolbar__input {
+  flex: 1 1 200px;
+  min-width: 180px;
+}
+
+.markets-toolbar__input::placeholder {
+  color: var(--text-dim);
+}
+
+.markets-toolbar__input:focus,
+.markets-toolbar__select:focus {
+  border-color: rgba(238, 255, 0, 0.35);
+  background-color: var(--card-elevated);
+}
+
+.markets-toolbar__select {
+  flex: 0 0 auto;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  color-scheme: dark;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.markets-toolbar__select:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.markets-toolbar__select option {
+  background-color: #141414;
+  color: var(--text);
+}
+
+.markets-toolbar__refresh {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.markets-toolbar__refresh:hover:not(:disabled) {
+  border-color: rgba(238, 255, 0, 0.35);
+}
+
+.markets-toolbar__refresh:disabled {
+  cursor: wait;
+}
+
+/* ---------------------------------------------------------------------------
+   Markets table (no inner scroll; right edge flat to meet trade panel).
+   -------------------------------------------------------------------------- */
+
+.markets-table-wrap {
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--card);
+}
+
+/* ---------------------------------------------------------------------------
+   Custom scrollbar (markets table, etc).
+   -------------------------------------------------------------------------- */
+
+.dimes-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(238, 255, 0, 0.25) transparent;
+}
+
+.dimes-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dimes-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dimes-scroll::-webkit-scrollbar-thumb {
+  background: rgba(238, 255, 0, 0.15);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.dimes-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(238, 255, 0, 0.35);
+}
+
+.dimes-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+   Auto-correction feedback (see TradePanel.tsx).
+   -------------------------------------------------------------------------- */
+
+:root {
+  --correction-amber: #F5C451;
+  --correction-ease: cubic-bezier(0.32, 0.72, 0.24, 1);
+}
+
+.correction-host {
+  position: relative;
+}
+
+.correction-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 4;
+  animation: correctionGlow 560ms var(--correction-ease) 160ms both;
+}
+
+.correction-overlay::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  height: 2px;
+  width: 0;
+  background: var(--correction-amber);
+  border-radius: 1px;
+  animation: correctionRailSweep 640ms var(--correction-ease) 120ms both;
+}
+
+@keyframes correctionGlow {
+  0% { box-shadow: 0 0 0 0 rgba(245, 196, 81, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(245, 196, 81, 0.18); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 196, 81, 0); }
+}
+
+@keyframes correctionRailSweep {
+  0% { width: 0; opacity: 0.92; }
+  75% { width: 100%; opacity: 0.92; }
+  100% { width: 100%; opacity: 0; }
+}
+
+.cta-breath {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 1;
+  animation: ctaBreath 560ms var(--correction-ease) 200ms both;
+}
+
+@keyframes ctaBreath {
+  0% { box-shadow: 0 0 0 0 rgba(245, 196, 81, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(245, 196, 81, 0.22); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 196, 81, 0); }
+}
+
+.panel-fail-ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 1;
+  animation: panelFailRing 220ms var(--correction-ease) both;
+}
+
+@keyframes panelFailRing {
+  0% { box-shadow: inset 0 0 0 1px rgba(245, 161, 161, 0.45); }
+  100% { box-shadow: inset 0 0 0 1px rgba(245, 161, 161, 0); }
+}
+
+[data-correcting='true'] .leverage-fill,
+[data-correcting='true'] .leverage-thumb {
+  transition: width 400ms var(--correction-ease), left 400ms var(--correction-ease) !important;
+}
+
+.stat-row-diff-in {
+  animation: statRowDiffIn 350ms var(--correction-ease) both;
+}
+
+@keyframes statRowDiffIn {
+  0% { opacity: 0; transform: translateX(6px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* ---------------------------------------------------------------------------
+   Live-data value flash — subtle highlight on polling change.
+   -------------------------------------------------------------------------- */
+
+.micro-stat-flash {
+  animation: microStatFlash 600ms ease-out both;
+}
+
+@keyframes microStatFlash {
+  0% { background-color: rgba(238, 255, 0, 0.12); }
+  100% { background-color: transparent; }
+}
+
+/* ---------------------------------------------------------------------------
+   Mobile breakpoint.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .trade-panel {
+    max-width: none !important;
+  }
+
+  .stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .header-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}

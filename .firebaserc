@@ -1,0 +1,12 @@
+{
+  "projects": {
+    "default": "dripster-dashboards-prod"
+  },
+  "targets": {
+    "dripster-dashboards-prod": {
+      "hosting": {
+        "demo": ["dimes-demo"]
+      }
+    }
+  }
+}

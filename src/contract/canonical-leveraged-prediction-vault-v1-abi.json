@@ -1,0 +1,376 @@
+{
+  "abi": [
+    {
+      "type": "function",
+      "name": "createPosition",
+      "inputs": [
+        {
+          "name": "positionSeed",
+          "type": "bytes16",
+          "internalType": "bytes16"
+        },
+        {
+          "name": "marketId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "tokenId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "collateralUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "leverageBps",
+          "type": "uint32",
+          "internalType": "uint32"
+        },
+        {
+          "name": "notionalUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "originationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "lifetimeFeeAprBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "liquidationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "venueFeeUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "signature",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "signatureExpiry",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "requestClose",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "event",
+      "name": "CloseRequested",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "owner",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "state",
+          "type": "uint8",
+          "indexed": false,
+          "internalType": "uint8"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "PositionCreated",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "positionSeed",
+          "type": "bytes16",
+          "indexed": false,
+          "internalType": "bytes16"
+        },
+        {
+          "name": "owner",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "marketId",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "tokenId",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "collateralUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "leverageBps",
+          "type": "uint32",
+          "indexed": false,
+          "internalType": "uint32"
+        },
+        {
+          "name": "notionalUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "originationFeeUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "venueFeeUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "originationFeeBps",
+          "type": "uint16",
+          "indexed": false,
+          "internalType": "uint16"
+        },
+        {
+          "name": "lifetimeFeeAprBps",
+          "type": "uint16",
+          "indexed": false,
+          "internalType": "uint16"
+        },
+        {
+          "name": "liquidationFeeBps",
+          "type": "uint16",
+          "indexed": false,
+          "internalType": "uint16"
+        },
+        {
+          "name": "state",
+          "type": "uint8",
+          "indexed": false,
+          "internalType": "uint8"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "error",
+      "name": "CancelDelayNotElapsed",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "CollateralBelowMinimum",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ECDSAInvalidSignature",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ECDSAInvalidSignatureLength",
+      "inputs": [
+        {
+          "name": "length",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ECDSAInvalidSignatureS",
+      "inputs": [
+        {
+          "name": "s",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "EmergencyOnlyMode",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "EnforcedPause",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "FailedCall",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "FeeRateExceedsMaximum",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "InsufficientCapital",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "InvalidLeverage",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "InvalidNotional",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "InvalidPositionState",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "InvalidSignature",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "MarketCapitalExceeded",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NewPositionsPaused",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NoTokensToClose",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NotPositionOwner",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PositionAlreadyExists",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PositionNotFound",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "SafeERC20FailedOperation",
+      "inputs": [
+        {
+          "name": "token",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ServerHalted",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "SignatureExpired",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "TokenCapitalExceeded",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "TotalCapitalExceeded",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "UserActionsPaused",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "UserCapitalExceeded",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ZeroAddress",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ZeroAmount",
+      "inputs": []
+    }
+  ]
+}
