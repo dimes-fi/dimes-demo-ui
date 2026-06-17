@@ -68,6 +68,31 @@ export interface UseTradeMachineParams {
   leverageBps: number;
   collateralUsd: number;
   slippageBps: number;
+  allowPartialFill?: boolean;
+  minFillBps?: number;
+}
+
+// The SDK's CreateOfferParams type predates partial-open; the wire body accepts
+// the two extra fields (the client decamelizes every key, the API camelizes
+// back). Extend the type locally so we can attach them without a cast soup.
+export type OfferParamsWithPartial = CreateOfferParams & {
+  allowPartialFill?: boolean;
+  minFillBps?: number;
+};
+
+// buildQuoteParams() only computes the five core fields, so re-attach the
+// partial-open opt-in afterward. Omits both fields entirely when not opted in
+// (atomic FOK behaviour is the default).
+export function withPartialFill(
+  params: CreateOfferParams,
+  opts: { allowPartialFill?: boolean; minFillBps?: number },
+): OfferParamsWithPartial {
+  if (!opts.allowPartialFill) return params;
+  return {
+    ...params,
+    allowPartialFill: true,
+    ...(opts.minFillBps != null ? { minFillBps: opts.minFillBps } : {}),
+  };
 }
 
 function getClient(): DimesClient {
@@ -95,13 +120,16 @@ export function useTradeMachine() {
 
   const getDraft = useCallback(async (params: UseTradeMachineParams) => {
     dispatch({ type: 'LOADING' });
-    const offerParams = buildQuoteParams({
-      marketTicker: params.marketTicker,
-      side: params.effectiveSide,
-      collateralUsd: params.collateralUsd,
-      leverageBps: params.leverageBps,
-      slippageBps: params.slippageBps,
-    });
+    const offerParams = withPartialFill(
+      buildQuoteParams({
+        marketTicker: params.marketTicker,
+        side: params.effectiveSide,
+        collateralUsd: params.collateralUsd,
+        leverageBps: params.leverageBps,
+        slippageBps: params.slippageBps,
+      }),
+      { allowPartialFill: params.allowPartialFill, minFillBps: params.minFillBps },
+    );
     lastParamsRef.current = offerParams;
     try {
       const client = getClient();

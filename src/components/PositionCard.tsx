@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { MicroStat } from './CardViewParts'
 import type { OpenPosition } from '../api/types'
+import { usePartialOpenStore } from '../store/partialOpen'
 import { CardShell } from './CardShell'
 
 export function PositionCard({
@@ -27,7 +28,25 @@ export function PositionCard({
   const isUnwindingPosition = position.status === 'unwinding'
   const isVoided = position.timing.isVoided && position.timing.isSettlementPending
   const isInFlight = isPendingPosition || isClosingPosition || isSettlingPosition || isUnwindingPosition
+  const isOpeningPosition = isInFlight && !isClosingPosition && !isSettlingPosition && !isUnwindingPosition
   const deferredClose = position.closeAttempt
+
+  // Live partial-open progress (websocket-driven), keyed by position id.
+  const partial = usePartialOpenStore((s) => s.byPosition[position.id])
+  const partialFilledPct = partial ? Math.min(100, Math.max(0, partial.filledBps / 100)) : 0
+  const showPartialFilling = isOpeningPosition && partial != null
+
+  // Detect a settled partial fill: the position opened smaller than requested
+  // while leverage was preserved (an unwind would have dropped leverage instead).
+  const entryNotional = parseFloat(position.entry.notionalUsd)
+  const currentNotional = parseFloat(position.current.notionalUsd)
+  const leveragePreserved = position.current.bookLeverageBps >= position.entry.leverageBps * 0.99
+  const isPartialOpen =
+    position.status === 'open' &&
+    entryNotional > 0 &&
+    currentNotional < entryNotional * 0.995 &&
+    leveragePreserved
+  const fillRatioPct = entryNotional > 0 ? (currentNotional / entryNotional) * 100 : 100
 
 
   const isYes = position.side === 'yes'
@@ -114,7 +133,64 @@ export function PositionCard({
           </div>
         )}
 
-        {isInFlight && !isVoided && (
+        {showPartialFilling && !isVoided && (
+          <div
+            style={{
+              background: partial?.floorMissed ? 'rgba(224,82,82,0.08)' : 'rgba(238,255,0,0.06)',
+              border: `1px solid ${partial?.floorMissed ? 'var(--red-border)' : 'var(--yellow-border)'}`,
+              borderRadius: 0,
+              padding: '11px 13px',
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 9 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                {!partial?.floorMissed && (
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: 'var(--yellow)',
+                      animation: 'pendingPulse 1.1s ease-in-out infinite',
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+                <span style={{ fontSize: 12, fontWeight: 600, color: partial?.floorMissed ? 'var(--red)' : 'var(--yellow)' }}>
+                  {partial?.floorMissed ? 'Order did not fill' : 'Partial fill in progress'}
+                </span>
+              </div>
+              {!partial?.floorMissed && (
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--yellow)', fontVariantNumeric: 'tabular-nums' }}>
+                  {partialFilledPct.toFixed(0)}%
+                </span>
+              )}
+            </div>
+            <div style={{ height: 3, width: '100%', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+              <div
+                className="pofill__bar"
+                style={{
+                  width: `${partial?.floorMissed ? 100 : partialFilledPct}%`,
+                  background: partial?.floorMissed ? 'var(--red)' : 'var(--yellow)',
+                }}
+              />
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+              {partial?.floorMissed
+                ? 'Minimum fill not reached — your funds were refunded.'
+                : `Filling toward your requested size${(partial?.attemptNumber ?? 0) > 1 ? ` · attempt ${partial?.attemptNumber}` : ''}`}
+            </div>
+            <style>{`
+              @keyframes pendingPulse {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.4; transform: scale(0.85); }
+              }
+            `}</style>
+          </div>
+        )}
+
+        {isInFlight && !isVoided && !showPartialFilling && (
           <div
             style={{
               display: 'flex',
@@ -281,6 +357,27 @@ export function PositionCard({
             >
               {isVoided ? 'voided' : position.status === 'pending' ? 'created' : position.status}
             </span>
+            {isPartialOpen && (() => {
+              const low = fillRatioPct < 75
+              return (
+                <span
+                  title={`Opened at ${fillRatioPct.toFixed(0)}% of requested ($${entryNotional.toFixed(2)})`}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: low ? 'var(--yellow)' : 'var(--green)',
+                    background: low ? 'var(--yellow-soft)' : 'var(--green-soft)',
+                    border: `1px solid ${low ? 'var(--yellow-border)' : 'var(--green-border)'}`,
+                    borderRadius: 0,
+                    padding: '2px 8px',
+                    textTransform: 'uppercase',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {fillRatioPct.toFixed(0)}% fill
+                </span>
+              )
+            })()}
           </div>
         </div>
 

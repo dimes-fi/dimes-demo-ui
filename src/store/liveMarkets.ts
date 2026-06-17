@@ -43,7 +43,15 @@ export const useLiveMarketsStore = create<LiveMarketsState>((set) => ({
       const idx = state.markets.findIndex((m) => m.id === patch.id)
       if (idx < 0) return state
       const markets = [...state.markets]
-      markets[idx] = { ...markets[idx], ...patch } as Market
+      // Deep-merge `leverage`: a max-leverage delta carries only the changed
+      // leverage fields, so a plain spread drops minBps/stepBps → NaN slider.
+      markets[idx] = {
+        ...markets[idx],
+        ...patch,
+        leverage: patch.leverage
+          ? { ...markets[idx].leverage, ...patch.leverage }
+          : markets[idx].leverage,
+      } as Market
       return { markets }
     }),
   remove: (id) =>

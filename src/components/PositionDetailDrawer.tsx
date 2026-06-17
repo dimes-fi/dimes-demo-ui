@@ -424,6 +424,26 @@ function OpenPositionDetail({
         </StatGroup>
 
         <StatGroup label="Position Size">
+          {(() => {
+            const reqNotional = parseFloat(position.entry.notionalUsd)
+            const curNotional = parseFloat(position.current.notionalUsd)
+            const leveragePreserved =
+              position.current.bookLeverageBps >= position.entry.leverageBps * 0.99
+            const isPartialOpen =
+              reqNotional > 0 && curNotional < reqNotional * 0.995 && leveragePreserved
+            if (!isPartialOpen) return null
+            const pct = (curNotional / reqNotional) * 100
+            return (
+              <>
+                <StatRow label="Requested Notional" value={`$${reqNotional.toFixed(2)}`} />
+                <StatRow
+                  label="Filled"
+                  value={`${pct.toFixed(0)}% ($${curNotional.toFixed(2)})`}
+                  valueColor="var(--yellow)"
+                />
+              </>
+            )
+          })()}
           <StatRow
             label="Current Collateral"
             value={`$${parseFloat(position.current.collateralUsd).toFixed(2)}`}

@@ -23,13 +23,25 @@ function notifyAccepting(markets: Market[]): void {
   })
 }
 
+// Shallow-spread the delta, but DEEP-merge the nested `leverage` object. A
+// max-leverage delta carries only the changed leverage fields, so a plain
+// spread replaces the whole object and drops minBps/stepBps → NaN in the
+// slider until the next full refetch.
+function mergeMarket(prev: Market, delta: MarketDelta): Market {
+  return {
+    ...prev,
+    ...delta,
+    leverage: delta.leverage ? { ...prev.leverage, ...delta.leverage } : prev.leverage,
+  } as Market
+}
+
 function mergeDelta(page: MarketsPage, delta: MarketDelta): MarketsPage {
   const idx = page.data.findIndex((m) => m.id === delta.id)
   if (idx < 0) {
     return page
   }
   const data = [...page.data]
-  data[idx] = { ...data[idx], ...delta } as Market
+  data[idx] = mergeMarket(data[idx], delta)
   return { ...page, data }
 }
 

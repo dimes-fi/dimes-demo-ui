@@ -5,8 +5,10 @@ import type { NotificationEvent, PositionEvent } from '@dimes-dot-fi/sdk/ws'
 import type { Position } from '../api/types'
 import { useAuthStore } from '../store/auth'
 import { usePendingPositionsStore } from '../store/pendingPositions'
+import { usePartialOpenStore } from '../store/partialOpen'
 import { useToastStore } from '../store/toasts'
 import { toastForPositionEvent } from '../utils/position-events'
+import { fillProgressLabel } from '../utils/partialFill'
 import { getApiBase } from '../runtimeConfig'
 
 export const wsTimestamps = new Map<string, number>()
@@ -19,16 +21,58 @@ export function usePositionSocket() {
   const socketRef = useRef<PositionSocket | null>(null)
   const addToast = useToastStore((s) => s.add)
   const removePending = usePendingPositionsStore((s) => s.remove)
+  const setPartialProgress = usePartialOpenStore((s) => s.setProgress)
+  const setFloorMissed = usePartialOpenStore((s) => s.setFloorMissed)
 
   const handleNotification = useCallback(
     (event: NotificationEvent) => {
+      const { code, message, params } = event.data
+      const positionId = typeof params?.positionId === 'string' ? params.positionId : null
+
+      // Partial-open progress drives the live fill bar on the position card and
+      // a transient toast — bps shown as a %, attempt number only when > 1.
+      if (code === 'PARTIAL_OPEN_PROGRESS' && positionId) {
+        const filledBps = typeof params?.filledBps === 'number' ? params.filledBps : 0
+        const attemptNumber = typeof params?.attemptNumber === 'number' ? params.attemptNumber : 0
+        setPartialProgress(positionId, {
+          filledBps,
+          attemptNumber,
+          cumulativeFilledMakingAmount:
+            typeof params?.cumulativeFilledMakingAmount === 'string'
+              ? params.cumulativeFilledMakingAmount
+              : undefined,
+          targetMakingAmount:
+            typeof params?.targetMakingAmount === 'string' ? params.targetMakingAmount : undefined,
+        })
+        addToast({
+          title: 'Order filling',
+          description: fillProgressLabel(filledBps, attemptNumber),
+          variant: 'info',
+          durationMs: 4000,
+        })
+        return
+      }
+
+      // Terminal failure: floor never filled, the position was reverted and the
+      // user fully refunded. Surface it loudly.
+      if (code === 'PARTIAL_OPEN_FLOOR_MISSED') {
+        if (positionId) setFloorMissed(positionId)
+        addToast({
+          title: 'Order did not fill',
+          description: 'Minimum fill not reached — your funds were refunded.',
+          variant: 'error',
+          durationMs: 8000,
+        })
+        return
+      }
+
       addToast({
-        title: event.data.message,
+        title: message,
         variant: 'info',
         durationMs: 5000,
       })
     },
-    [addToast],
+    [addToast, setPartialProgress, setFloorMissed],
   )
 
   const handleEvent = useCallback(

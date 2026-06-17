@@ -10,6 +10,8 @@ import { MarketCard } from './components/MarketCard'
 import { PositionCard } from './components/PositionCard'
 import { SettledCard } from './components/SettledCard'
 import { QuoteDetails } from './components/QuoteDetails'
+import { TradePanel } from './components/TradePanel'
+import { usePartialOpenStore } from './store/partialOpen'
 import type { Market, Offer, OpenPosition, ClosedPosition } from './api/types'
 
 const mockPerNotional = {
@@ -226,6 +228,55 @@ const mockOpenPosition: OpenPosition = {
     isVoided: false,
     isSettlementPending: false,
   },
+}
+
+// Offer echoing a partial-fill opt-in (min 30%).
+const mockPartialOffer: Offer = {
+  ...mockOffer,
+  id: 'dm_off_partial',
+  allowPartialFill: true,
+  minFillBps: 3000,
+}
+
+// A position that opened at 60% of the requested size (leverage preserved).
+const mockPartialOpenPosition: OpenPosition = {
+  ...mockOpenPosition,
+  id: 'dm_pos_partial',
+  current: {
+    ...mockOpenPosition.current,
+    bookLeverageBps: 50000, // preserved across the shrink
+    leverageBps: 50000,
+    notionalUsd: '30.00', // 60% of the $50 requested entry notional
+    notionalUsdPips: '300000',
+    collateralUsd: '6.00',
+    collateralUsdPips: '60000',
+    markPriceUsd: '0.35',
+    markPriceUsdPips: '3500',
+    positionValueUsd: '6.30',
+    positionValueUsdPips: '63000',
+    unrealizedPnlUsd: '1.82',
+    unrealizedPnlBps: 600,
+  },
+}
+
+// A position that opened at 88% of requested (≥75% → green fill tag).
+const mockPartialOpenHighPosition: OpenPosition = {
+  ...mockPartialOpenPosition,
+  id: 'dm_pos_partial_high',
+  current: {
+    ...mockPartialOpenPosition.current,
+    notionalUsd: '44.00', // 88% of the $50 requested
+    notionalUsdPips: '440000',
+    collateralUsd: '8.80',
+    collateralUsdPips: '88000',
+  },
+}
+
+// A position mid partial-open (websocket fill progress drives the bar).
+const mockFillingPosition: OpenPosition = {
+  ...mockOpenPosition,
+  id: 'dm_pos_filling',
+  status: 'pending',
 }
 
 const mockUnwindingPosition: OpenPosition = {
@@ -452,6 +503,49 @@ function LiveDemo() {
   )
 }
 
+/**
+ * Drives the live partial-open progress store for the "filling" position card,
+ * mirroring the PARTIAL_OPEN_PROGRESS / PARTIAL_OPEN_FLOOR_MISSED websocket
+ * notifications. Buttons step the fill or trip the floor-missed terminal state.
+ */
+function FillingDemo() {
+  const setProgress = usePartialOpenStore((s) => s.setProgress)
+  const setFloorMissed = usePartialOpenStore((s) => s.setFloorMissed)
+  const clear = usePartialOpenStore((s) => s.clear)
+  const id = 'dm_pos_filling'
+  const attempt = useRef(0)
+  const filled = useRef(0)
+
+  useEffect(() => {
+    attempt.current = 1
+    filled.current = 3500
+    setProgress(id, { filledBps: 3500, attemptNumber: 1 })
+    return () => clear(id)
+  }, [setProgress, clear])
+
+  const step = () => {
+    attempt.current += 1
+    filled.current = Math.min(10000, filled.current + 2200)
+    setProgress(id, { filledBps: filled.current, attemptNumber: attempt.current })
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 480 }}>
+      <PositionCard position={mockFillingPosition} />
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button style={demoBtn} onClick={step}>Advance fill (+22%)</button>
+        <button style={demoBtn} onClick={() => setFloorMissed(id)}>Trip floor-missed</button>
+        <button
+          style={demoBtn}
+          onClick={() => { attempt.current = 1; filled.current = 3500; setProgress(id, { filledBps: 3500, attemptNumber: 1 }) }}
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Preview() {
   const [leverageBps, setLeverageBps] = useState(30000)
 
@@ -477,6 +571,33 @@ export default function Preview() {
           <MarketCard market={mockMarket} onSelect={() => {}} />
           <MarketCard market={mockMarket2} onSelect={() => {}} />
           <MarketCard market={mockMarket3} onSelect={() => {}} />
+        </div>
+
+        {/* Partial Fill on Open */}
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: '#EEFF00', marginBottom: 12 }}>Partial Fill on Open</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 24, marginBottom: 16, alignItems: 'start' }}>
+          <div>
+            <p style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>Trade panel · open Advanced → toggle “Allow partial fill”</p>
+            <TradePanel market={mockMarket} onClose={() => {}} />
+          </div>
+          <div>
+            <p style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>Quote echo — “Partial fill · Allowed · min 30%”</p>
+            <CardShell>
+              <QuoteDetails offer={mockPartialOffer} />
+            </CardShell>
+          </div>
+          <div>
+            <p style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>Live filling card (websocket-driven)</p>
+            <FillingDemo />
+          </div>
+          <div>
+            <p style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>Settled partial — 60% (under 75% → yellow)</p>
+            <PositionCard position={mockPartialOpenPosition} />
+          </div>
+          <div>
+            <p style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>Settled partial — 88% (≥75% → green)</p>
+            <PositionCard position={mockPartialOpenHighPosition} />
+          </div>
         </div>
 
         {/* Leverage Slider */}

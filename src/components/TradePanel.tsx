@@ -9,7 +9,7 @@ import {
   defaultSide,
   rejectionReasonText,
 } from '../api/types'
-import { useTradeMachine, buildQuoteParams } from '../hooks/useTradeMachine'
+import { useTradeMachine, buildQuoteParams, withPartialFill } from '../hooks/useTradeMachine'
 import { useValueTween } from '../hooks/useValueTween'
 import { usePendingPositionsStore } from '../store/pendingPositions'
 import {
@@ -29,6 +29,8 @@ import { formatApiError } from '../api/error-messages'
 import { formatContractError } from '../contract/error-messages'
 import { useToastStore } from '../store/toasts'
 import { LeverageSlider } from './LeverageSlider'
+import { PartialFillControl } from './PartialFillControl'
+import { MIN_FILL_BPS_DEFAULT, partialFillErrorMessage, snapMinFillBps } from '../utils/partialFill'
 import { QuoteDetails } from './QuoteDetails'
 import { QuoteErrorHint } from './QuoteErrorHint'
 import { Button } from './ui/Button'
@@ -98,6 +100,8 @@ export function TradePanel({
   }, [market.ticker, market.leverage.minBps, market.leverage.maxBps, market.leverage.maxYesBps, market.leverage.maxNoBps, market.leverage.stepBps, side])
   const [slippageBps, setSlippageBps] = useState(DEFAULT_SLIPPAGE_BPS)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [allowPartialFill, setAllowPartialFill] = useState(false)
+  const [minFillBps, setMinFillBps] = useState(MIN_FILL_BPS_DEFAULT)
 
   const queryClient = useQueryClient()
   const addPendingStub = usePendingPositionsStore((s) => s.add)
@@ -278,12 +282,15 @@ export function TradePanel({
       leverageBps,
       collateralUsd: Number(collateralUsd),
       slippageBps,
+      allowPartialFill,
+      minFillBps,
     })
   }
 
   const apiErr = offerError && typeof offerError === 'object' && 'code' in offerError
     ? offerError as { code: string; params: Record<string, unknown> | null }
     : null
+  const partialFillError = partialFillErrorMessage(apiErr?.code)
   const offerHint = quoteErrorHint(
     apiErr?.code ?? null,
     apiErr?.params ?? null,
@@ -358,13 +365,16 @@ export function TradePanel({
 
     const errorDraft = tradeState.phase === 'error' ? tradeState.draft : undefined
     if (errorDraft) {
-      correctAndPromote(errorDraft, buildQuoteParams({
-        marketTicker: market.ticker,
-        side,
-        leverageBps: adjustedLeverage,
-        collateralUsd: adjustedCollateral,
-        slippageBps: adjustedSlippage,
-      }))
+      correctAndPromote(errorDraft, withPartialFill(
+        buildQuoteParams({
+          marketTicker: market.ticker,
+          side,
+          leverageBps: adjustedLeverage,
+          collateralUsd: adjustedCollateral,
+          slippageBps: adjustedSlippage,
+        }),
+        { allowPartialFill, minFillBps },
+      ))
     }
 
   }, [offerError])
@@ -674,6 +684,13 @@ export function TradePanel({
                     })}
                   </div>
                 </div>
+                <PartialFillControl
+                  enabled={allowPartialFill}
+                  minFillBps={minFillBps}
+                  notionalUsd={collateralNum * (leverageBps / 10000)}
+                  onToggle={(next) => { setAllowPartialFill(next); clearOffer() }}
+                  onChangeMinFill={(bps) => { setMinFillBps(snapMinFillBps(bps)); clearOffer() }}
+                />
               </div>
             </div>
           </div>
@@ -703,7 +720,31 @@ export function TradePanel({
           )}
         </div>
 
-        {!offerHint && !isAutoCorrecting && <ErrorBanner error={offerError} onDismiss={clearOffer} />}
+        {partialFillError && !isAutoCorrecting && (
+          <div
+            role="alert"
+            style={{
+              marginTop: 12,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
+              padding: '11px 13px',
+              background: 'rgba(245,166,35,0.07)',
+              border: '1px solid rgba(245,166,35,0.25)',
+              color: '#F5A623',
+              fontSize: 'var(--fs-sm)',
+              lineHeight: 1.4,
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <span>{partialFillError}</span>
+          </div>
+        )}
+        {!offerHint && !isAutoCorrecting && !partialFillError && <ErrorBanner error={offerError} onDismiss={clearOffer} />}
         {!isAutoCorrecting && (
           <QuoteErrorHint
             hint={offerHint}

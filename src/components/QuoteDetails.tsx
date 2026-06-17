@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import type { Offer } from '../api/types'
+import { formatFillPct } from '../utils/partialFill'
 import { StatRow } from './StatRow'
 
 export function QuoteDetails({
@@ -73,6 +74,13 @@ export function QuoteDetails({
         valueColor="#F5A623"
         previousValue={prev ? `$${prev.currentLiquidationPriceUsd}` : undefined}
       />
+      {offer.allowPartialFill && (
+        <StatRow
+          label="Partial fill"
+          value={offer.minFillBps != null ? `Allowed · min ${formatFillPct(offer.minFillBps)}` : 'Allowed'}
+          valueColor="var(--yellow)"
+        />
+      )}
 
       <div
         style={{

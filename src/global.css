@@ -498,6 +498,208 @@ textarea {
 }
 
 /* ---------------------------------------------------------------------------
+   Partial-fill control — switch + min-fill slider, lives in the Advanced panel.
+   -------------------------------------------------------------------------- */
+
+.pf {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.pf__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.pf__switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  margin-top: 1px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-subtle);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 200ms var(--adv-ease), border-color 200ms var(--adv-ease);
+}
+
+.pf__switch--on {
+  background: var(--yellow-soft);
+  border-color: var(--yellow-border);
+}
+
+.pf__switch-knob {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transform: translateY(-50%);
+  transition: transform 220ms var(--adv-ease), background 220ms var(--adv-ease);
+}
+
+.pf__switch--on .pf__switch-knob {
+  transform: translate(16px, -50%);
+  background: var(--yellow);
+  box-shadow: 0 0 10px rgba(238, 255, 0, 0.6);
+}
+
+.pf__head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pf__title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pf__sub {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  line-height: 1.3;
+}
+
+.pf__panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms var(--adv-ease);
+}
+
+.pf__panel--open {
+  grid-template-rows: 1fr;
+}
+
+.pf__panel-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.pf__panel--open .pf__panel-inner {
+  /* Horizontal + top padding keeps the thumb (at 0%/100%) and the value's neon
+     glow clear of the panel's overflow:hidden clip edge. */
+  padding: 20px 16px 2px;
+}
+
+.pf__slider-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.pf__slider-label {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.pf__value {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--yellow);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 14px rgba(238, 255, 0, 0.6);
+}
+
+.pf__track-host {
+  position: relative;
+  height: 24px;
+}
+
+.pf__track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pf__track-fill {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 2px;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, transparent, #eeff00);
+  transition: width 0.1s ease;
+}
+
+.pf__dot {
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: background 0.15s ease;
+  z-index: 1;
+}
+
+.pf__thumb {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--yellow);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px rgba(238, 255, 0, 0.7);
+  z-index: 2;
+  transition: left 0.1s ease;
+}
+
+.pf__range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.pf__scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.pf__note {
+  margin: 12px 0 0;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.pf__note strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Live partial-open fill bar (position card, during open finalization). */
+.pofill__bar {
+  height: 100%;
+  background: var(--yellow);
+  transition: width 0.5s var(--adv-ease);
+}
+
+/* ---------------------------------------------------------------------------
    Trade drawer — slides in from right, overlays content.
    -------------------------------------------------------------------------- */
 
