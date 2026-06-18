@@ -10,6 +10,7 @@ import {
   rejectionReasonText,
 } from '../api/types'
 import { useTradeMachine, buildQuoteParams, withPartialFill } from '../hooks/useTradeMachine'
+import { useFeeRates } from '../hooks/useFeeRates'
 import { useValueTween } from '../hooks/useValueTween'
 import { usePendingPositionsStore } from '../store/pendingPositions'
 import {
@@ -32,6 +33,7 @@ import { LeverageSlider } from './LeverageSlider'
 import { PartialFillControl } from './PartialFillControl'
 import { MIN_FILL_BPS_DEFAULT, partialFillErrorMessage, snapMinFillBps } from '../utils/partialFill'
 import { QuoteDetails } from './QuoteDetails'
+import { TradeEstimate } from './TradeEstimate'
 import { QuoteErrorHint } from './QuoteErrorHint'
 import { Button } from './ui/Button'
 import { Field } from './ui/Field'
@@ -48,10 +50,18 @@ const PRESET_AMOUNTS = [50, 100, 500] as const
 const DEFAULT_SLIPPAGE_BPS = 800 // 8%
 const DEFAULT_LEVERAGE_BPS = 20000 // 2x
 const SLIPPAGE_PRESETS_BPS = [200, 500, 800] as const
+// Floor the slider step at 0.5x even when the API publishes something finer
+// (e.g. 2500bps = 0.25x). 0.5x keeps leverage labels to a single decimal
+// (2.5x, not 1.25x) and stops the dots from crowding the track. We still honour
+// the API step when it's coarser than this — only the fine end is clamped.
 const FORCED_LEVERAGE_STEP_BPS = 5000 // 0.5x
 
+function leverageStepBps(market: { leverage: MarketLeverage }) {
+  return Math.max(market.leverage.stepBps, FORCED_LEVERAGE_STEP_BPS)
+}
+
 function clampLeverageToMarket(target: number, market: { leverage: MarketLeverage }, side: 'yes' | 'no' = 'yes', round: 'nearest' | 'down' | 'up' = 'nearest') {
-  const step = Math.max(market.leverage.stepBps, FORCED_LEVERAGE_STEP_BPS)
+  const step = leverageStepBps(market)
   const minBps = market.leverage.minBps
   const maxBps = leverageMaxBps(market.leverage, side)
   const maxSteps = Math.max(0, Math.floor((maxBps - minBps) / step))
@@ -102,6 +112,8 @@ export function TradePanel({
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [allowPartialFill, setAllowPartialFill] = useState(false)
   const [minFillBps, setMinFillBps] = useState(MIN_FILL_BPS_DEFAULT)
+
+  const { data: feeRates } = useFeeRates(market.ticker)
 
   const queryClient = useQueryClient()
   const addPendingStub = usePendingPositionsStore((s) => s.add)
@@ -290,7 +302,7 @@ export function TradePanel({
   const apiErr = offerError && typeof offerError === 'object' && 'code' in offerError
     ? offerError as { code: string; params: Record<string, unknown> | null }
     : null
-  const partialFillError = partialFillErrorMessage(apiErr?.code)
+  const partialFillError = partialFillErrorMessage(apiErr?.code, apiErr?.params)
   const offerHint = quoteErrorHint(
     apiErr?.code ?? null,
     apiErr?.params ?? null,
@@ -301,6 +313,7 @@ export function TradePanel({
     collateralUsd: Number(collateralUsd) || 0,
     leverageBps,
     slippageBps,
+    minFillBps,
   })
 
   // Auto-correct inputs the moment a quote error returns a constraint hint.
@@ -340,6 +353,7 @@ export function TradePanel({
     let adjustedCollateral = Number(collateralUsd) || 0
     let adjustedLeverage = leverageBps
     let adjustedSlippage = slippageBps
+    let adjustedMinFill = minFillBps
     let toValue = adj.toValue
 
     if (adj.field === 'collateral') {
@@ -354,6 +368,10 @@ export function TradePanel({
       setSlippageBps(adj.toValue)
       setAdvancedOpen(true)
       adjustedSlippage = adj.toValue
+    } else if (adj.field === 'minFill') {
+      toValue = snapMinFillBps(adj.toValue)
+      setMinFillBps(toValue)
+      adjustedMinFill = toValue
     }
     correctionNonceRef.current += 1
     setCorrection({
@@ -373,7 +391,7 @@ export function TradePanel({
           collateralUsd: adjustedCollateral,
           slippageBps: adjustedSlippage,
         }),
-        { allowPartialFill, minFillBps },
+        { allowPartialFill, minFillBps: adjustedMinFill },
       ))
     }
 
@@ -396,19 +414,24 @@ export function TradePanel({
     correction?.field === 'slippage' ? correction.toValue : 0,
     correction?.field === 'slippage' ? correction.nonce : 0,
   )
+  const minFillTween = useValueTween(
+    correction?.field === 'minFill' ? correction.fromValue : 0,
+    correction?.field === 'minFill' ? correction.toValue : 0,
+    correction?.field === 'minFill' ? correction.nonce : 0,
+  )
 
   const displayCollateral =
     correction?.field === 'collateral' && collateralTween.active
       ? collateralTween.value.toFixed(2)
       : collateralUsd
-  const displayLeverageBps =
-    correction?.field === 'leverage' && leverageTween.active
-      ? leverageTween.value
-      : leverageBps
   const displaySlippagePct =
     correction?.field === 'slippage' && slippageTween.active
       ? (slippageTween.value / 100).toFixed(2).replace(/\.?0+$/, '')
       : (slippageBps / 100).toString()
+  const displayMinFillBps =
+    correction?.field === 'minFill' && minFillTween.active
+      ? snapMinFillBps(Math.round(minFillTween.value))
+      : minFillBps
 
   const handleApprove = async () => {
     if (!draft) return
@@ -588,8 +611,8 @@ export function TradePanel({
           <LeverageSlider
             min={market.leverage.minBps}
             max={sideMaxBps}
-            step={Math.max(market.leverage.stepBps, FORCED_LEVERAGE_STEP_BPS)}
-            value={displayLeverageBps}
+            step={leverageStepBps(market)}
+            value={leverageBps}
             onChange={(v) => { setLeverageBps(v); clearOffer(); }}
             maxViableStep={maxViableLev}
           />
@@ -611,7 +634,7 @@ export function TradePanel({
               fontWeight: 500,
             }}
           >
-            ⚠ At ${(collateralNum * (leverageBps / 10000)).toFixed(2)} notional, max leverage is ~{(notionalViableLev / 10000).toFixed(notionalViableLev % 10000 === 0 ? 0 : 1)}×
+            ⚠ At ${(collateralNum * (leverageBps / 10000)).toFixed(2)} notional, max leverage is ~{(notionalViableLev / 10000).toFixed(1).replace(/\.0$/, '')}×
           </div>
         )}
 
@@ -686,8 +709,9 @@ export function TradePanel({
                 </div>
                 <PartialFillControl
                   enabled={allowPartialFill}
-                  minFillBps={minFillBps}
+                  minFillBps={displayMinFillBps}
                   notionalUsd={collateralNum * (leverageBps / 10000)}
+                  correcting={correction?.field === 'minFill' && !isAutoCorrecting}
                   onToggle={(next) => { setAllowPartialFill(next); clearOffer() }}
                   onChangeMinFill={(bps) => { setMinFillBps(snapMinFillBps(bps)); clearOffer() }}
                 />
@@ -764,6 +788,17 @@ export function TradePanel({
         />
 
         {offerLoading && !draft && <QuoteSkeleton />}
+
+        {!draft && !offerLoading && feeRates && collateralNum > 0 && (
+          <TradeEstimate
+            market={market}
+            side={side}
+            collateralUsd={collateralNum}
+            leverageBps={leverageBps}
+            slippageBps={slippageBps}
+            feeRates={feeRates}
+          />
+        )}
 
         {draft && (
           <QuoteDetails

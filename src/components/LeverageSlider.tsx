@@ -1,3 +1,11 @@
+import { leverageSteps, thinDots } from '../utils/leverageDots'
+import { useSmoothNumber } from '../hooks/useSmoothNumber'
+
+/** bps → leverage label with up to 1 decimal, trailing zero trimmed. */
+function formatLeverage(bps: number): string {
+  return (bps / 10000).toFixed(1).replace(/\.0$/, '')
+}
+
 export function LeverageSlider({
   min,
   max,
@@ -13,12 +21,11 @@ export function LeverageSlider({
   onChange: (value: number) => void
   maxViableStep?: number | null
 }) {
-  const maxSteps = Math.max(0, Math.floor((max - min) / step))
-  const effectiveMax = min + maxSteps * step
-  const steps: number[] = []
-  for (let i = 0; i <= maxSteps; i++) {
-    steps.push(min + i * step)
-  }
+  const steps = leverageSteps(min, max, step)
+  const maxSteps = steps.length - 1
+  const effectiveMax = steps[maxSteps]
+  // Snapping honours every API step; dots are thinned only for legibility.
+  const dots = thinDots(steps)
 
   const snap = (v: number) => {
     const clamped = Math.min(Math.max(v, min), effectiveMax)
@@ -27,8 +34,12 @@ export function LeverageSlider({
   }
 
   const range = effectiveMax - min
+  // Smoothly chase the value so the headline number eases rather than snapping.
+  const smooth = useSmoothNumber(value)
   const pct = range > 0 ? ((value - min) / range) * 100 : 0
-  const displayValue = (value / 10000).toFixed(value % 10000 === 0 ? 0 : 1)
+  // Format the animating value the same way as the resting one so a whole-number
+  // target never flashes "4.0x" mid-roll and then drops the ".0" on landing.
+  const displayValue = formatLeverage(smooth)
 
   if (maxSteps === 0) {
     return (
@@ -137,7 +148,7 @@ export function LeverageSlider({
         />
 
         {/* Step dots */}
-        {steps.map((s) => {
+        {dots.map((s) => {
           const dotPct = range > 0 ? ((s - min) / range) * 100 : 50
           const isActive = s <= value
           const isBeyondViable = maxViableStep != null && s > maxViableStep
@@ -214,10 +225,10 @@ export function LeverageSlider({
         }}
       >
         <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>
-          {(min / 10000).toFixed(min % 10000 === 0 ? 0 : 1)}x
+          {formatLeverage(min)}x
         </span>
         <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>
-          {(effectiveMax / 10000).toFixed(effectiveMax % 10000 === 0 ? 0 : 1)}x
+          {formatLeverage(effectiveMax)}x
         </span>
       </div>
     </div>

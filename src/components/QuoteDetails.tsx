@@ -1,7 +1,45 @@
 import { useState, useEffect, useMemo } from 'react'
 import type { Offer } from '../api/types'
+import { computeMaxGain } from '../api/types'
+import { formatUsd } from '../utils/format'
 import { formatFillPct } from '../utils/partialFill'
 import { StatRow } from './StatRow'
+
+const USDC_UNITS_PER_USD = 1e6
+
+/**
+ * Net/gross maximum gain on a winning settlement (profit over principal),
+ * computed client-side from the offer's USDC-unit fields via the SDK. Mirrors
+ * the server's `expand=max_gain`: full token value at $1 minus notional, then
+ * minus the open trading + origination fees. Excludes time-based lifetime fees,
+ * so it is an upper bound; can be negative for very high-price entries.
+ */
+function maxGainForOffer(offer: Offer) {
+  const positionTokenUnits = Number(offer.minExpectedPositionTokenUnits)
+  const notionalUsdcUnits = Number(offer.notionalUsdcUnits)
+  const expectedOpenTradingFeeUsdcUnits = Number(offer.expectedOpenTradingFeeUsdcUnits)
+  const originationFeeUsdcUnits = Number(offer.originationFeeUsdcUnits)
+
+  if (
+    !Number.isFinite(positionTokenUnits) ||
+    !Number.isFinite(notionalUsdcUnits) ||
+    !Number.isFinite(expectedOpenTradingFeeUsdcUnits) ||
+    !Number.isFinite(originationFeeUsdcUnits)
+  ) {
+    return null
+  }
+
+  return computeMaxGain({
+    positionTokenUnits,
+    notionalUsdcUnits,
+    expectedOpenTradingFeeUsdcUnits,
+    originationFeeUsdcUnits,
+  })
+}
+
+function formatUsdcUnits(usdcUnits: number): string {
+  return formatUsd(usdcUnits / USDC_UNITS_PER_USD)
+}
 
 export function QuoteDetails({
   offer,
@@ -33,6 +71,9 @@ export function QuoteDetails({
   }, [expiresAtMs])
 
   const prev = previousOffer
+
+  const maxGain = useMemo(() => maxGainForOffer(offer), [offer])
+  const prevMaxGain = useMemo(() => (prev ? maxGainForOffer(prev) : null), [prev])
 
   return (
     <div style={{ padding: '12px 0' }}>
@@ -133,6 +174,23 @@ export function QuoteDetails({
         valueColor="#ffffff"
         previousValue={prev ? `$${prev.totalUserAmountUsd}` : undefined}
       />
+
+      {maxGain && (
+        <>
+          <StatRow
+            label="Max gain on win"
+            value={formatUsdcUnits(maxGain.netMaxGainUsdcUnits)}
+            valueColor={maxGain.netMaxGainUsdcUnits >= 0 ? '#44FF97' : '#F5A623'}
+            previousValue={
+              prevMaxGain ? formatUsdcUnits(prevMaxGain.netMaxGainUsdcUnits) : undefined
+            }
+          />
+          <StatRow
+            label="  · Before fees"
+            value={formatUsdcUnits(maxGain.grossMaxGainUsdcUnits)}
+          />
+        </>
+      )}
 
       {!hideExpiry && <QuoteExpiryBar secondsLeft={secondsLeft} totalSeconds={totalSeconds} />}
     </div>

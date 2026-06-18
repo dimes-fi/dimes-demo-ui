@@ -27,6 +27,12 @@ export type {
   SideEligibility,
   SidedEligibility,
   OriginationFeeBreakdown,
+  MaxGainInput,
+  MaxGainResult,
+  FeeRates,
+  FeeRatesMarket,
+  FeeRatesOriginationTier,
+  GetFeeRatesParams,
 } from '@dimes-dot-fi/sdk';
 
 export {
@@ -42,4 +48,10 @@ export {
   maxLeverageBpsAtNotional,
   maxViableLeverageBpsForCollateral,
   getOriginationFeeBreakdown,
+  computeMaxGain,
+  resolveOriginationFeeBps,
+  computeOriginationFeeUsdcUnits,
+  computePolymarketTradingFee,
+  expectedPositionTokenUnits,
+  estimateLiquidationPrice,
 } from '@dimes-dot-fi/sdk';

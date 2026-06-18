@@ -35,26 +35,56 @@ export function fillProgressLabel(filledBps: number, attemptNumber: number): str
   return attemptNumber > 1 ? `${pct} filled · attempt ${attemptNumber}` : `${pct} filled`
 }
 
+/** Error `details` (camelCase, as transformed by the API client). */
+export type PartialFillErrorParams = Record<string, unknown> | null | undefined
+
+type PartialFillErrorEntry = string | ((params: PartialFillErrorParams) => string)
+
+function readNumber(params: PartialFillErrorParams, key: string): number | null {
+  const raw = params ? params[key] : undefined
+  const n = typeof raw === 'string' ? Number(raw) : typeof raw === 'number' ? raw : NaN
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * The floor-cap rejection (`QUOTE_MIN_FILL_BPS_BELOW_FLOOR`) carries `boundBy`
+ * ("collateral" | "notional") and `floorMinFillBps` — the smallest minimum-fill
+ * that would be accepted at this size. We surface both so the message tells the
+ * user exactly how to fix it.
+ */
+function belowFloorMessage(params: PartialFillErrorParams): string {
+  const limit = params?.boundBy === 'notional' ? 'minimum order size' : 'minimum collateral'
+  const floor = readNumber(params, 'floorMinFillBps')
+  if (floor == null || floor > MIN_FILL_BPS_MAX) {
+    return `This trade is too small for a partial fill without falling below the ${limit}. Increase your trade size, or turn off partial fill to open atomically.`
+  }
+  return `This trade is too small for that minimum fill — a partial fill could fall below the ${limit}. Raise the minimum fill to at least ${formatFillPct(floor)}, or increase your trade size.`
+}
+
 /**
  * Rejection codes specific to partial-open. Range/step are pre-validated by the
  * slider, so in practice only the floor-cap and kill-switch codes surface — but
  * we map all of them so a stale/edge request still reads cleanly.
  */
-export const PARTIAL_FILL_ERROR_MESSAGES: Record<string, string> = {
+export const PARTIAL_FILL_ERROR_MESSAGES: Record<string, PartialFillErrorEntry> = {
   QUOTE_MIN_FILL_BPS_REQUIRES_FAK:
     'Partial-fill request was malformed. Please re-quote.',
   QUOTE_MIN_FILL_BPS_OUT_OF_RANGE:
     'Minimum fill must be between 20% and 50%.',
   QUOTE_MIN_FILL_BPS_STEP_INVALID:
     'Minimum fill must be set in 5% steps.',
-  QUOTE_MIN_FILL_BPS_BELOW_FLOOR:
-    'This trade is too small for that minimum fill. Increase collateral or raise the minimum fill %.',
+  QUOTE_MIN_FILL_BPS_BELOW_FLOOR: belowFloorMessage,
   QUOTE_FAK_ORDER_TYPE_DISABLED:
     'Partial fills are temporarily unavailable. Turn off partial fill to continue.',
 }
 
 /** Maps a raw API error code to a partial-fill message, or null if unrelated. */
-export function partialFillErrorMessage(code: string | null | undefined): string | null {
+export function partialFillErrorMessage(
+  code: string | null | undefined,
+  params?: PartialFillErrorParams,
+): string | null {
   if (!code) return null
-  return PARTIAL_FILL_ERROR_MESSAGES[code] ?? null
+  const entry = PARTIAL_FILL_ERROR_MESSAGES[code]
+  if (entry == null) return null
+  return typeof entry === 'function' ? entry(params) : entry
 }

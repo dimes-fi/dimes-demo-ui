@@ -1,7 +1,10 @@
 import type { Market } from '../api/types'
 import { leverageMaxBps } from '../api/types'
 
-const FORCED_LEVERAGE_STEP_BPS = 5000
+// Mirror of TradePanel's slider floor: never offer leverage finer than 0.5x
+// even if the API step is finer, so labels stay single-decimal. The API step
+// wins when it's coarser. Keep this in sync with FORCED_LEVERAGE_STEP_BPS there.
+const FORCED_LEVERAGE_STEP_BPS = 5000 // 0.5x
 
 export interface CapacityBounds {
   minNotionalPips: number

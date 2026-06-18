@@ -11,12 +11,14 @@ export function PartialFillControl({
   enabled,
   minFillBps,
   notionalUsd,
+  correcting = false,
   onToggle,
   onChangeMinFill,
 }: {
   enabled: boolean
   minFillBps: number
   notionalUsd: number
+  correcting?: boolean
   onToggle: (next: boolean) => void
   onChangeMinFill: (bps: number) => void
 }) {
@@ -55,7 +57,10 @@ export function PartialFillControl({
         <div className="pf__panel-inner">
           <div className="pf__slider-head">
             <span className="pf__slider-label">Minimum fill</span>
-            <span className="pf__value">{pct}%</span>
+            <span className={`pf__value correction-host${correcting ? ' correction-host--active' : ''}`}>
+              {pct}%
+              {correcting && <span className="correction-overlay" aria-hidden />}
+            </span>
           </div>
 
           <div className="pf__track-host">
