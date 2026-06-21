@@ -60,7 +60,9 @@ All config is read from Vite environment variables. See
 | `VITE_RPC_URL`                  | _(unset)_                              | Optional custom RPC endpoint; leave empty to use wagmi's default.                                                                                                                  |
 | `VITE_USDC_ADDRESS`             | _(sandbox mock)_                       | Collateral token the vault accepts. Defaults to the sandbox mock USDC so the demo works out of the box. See [Chains and contracts](#chains-and-contracts) for prod/testnet values. |
 | `VITE_WALLETCONNECT_PROJECT_ID` | _(demo id bundled in `src/config.ts`)_ | Get a free project id at <https://cloud.walletconnect.com> if you fork for production. WalletConnect project ids are public identifiers, not secrets.                              |
-| `VITE_PRIVY_APP_ID`             | _(unset)_                              | When set, swaps the default RainbowKit wallet stack for [Privy](https://privy.io) (embedded wallets + Privy login). See [Wallets: RainbowKit or Privy](#wallets-rainbowkit-or-privy). Privy app ids are public client identifiers, not secrets. |
+| `VITE_PRIVY_APP_ID`             | _(unset)_                              | When set, swaps the default RainbowKit wallet stack for [Privy](https://privy.io) (embedded wallets + Privy login). See [Wallet backends](#wallet-backends-rainbowkit-privy-or-turnkey). Privy app ids are public client identifiers, not secrets. |
+| `VITE_TURNKEY_ORG_ID`           | _(unset)_                              | Turnkey organization ID. Set together with `VITE_TURNKEY_AUTH_PROXY_CONFIG_ID` to use the [Turnkey](https://turnkey.com) wallet stack. Public identifier, not a secret. |
+| `VITE_TURNKEY_AUTH_PROXY_CONFIG_ID` | _(unset)_                          | Turnkey WalletKit / Auth Proxy config ID (from the dashboard). Required alongside the org id for Turnkey. |
 | `VITE_API_KEY`                  | _(unset)_                              | ⚠ **Demo-only.** See below.                                                                                                                                                        |
 
 ## Auth: demo vs real ⚠
@@ -91,17 +93,37 @@ The `VITE_API_KEY` path exists in this repo purely so the demo runs
 end-to-end with a single command, and the module is commented to make that
 clear.
 
-## Wallets: RainbowKit or Privy
+## Wallet backends: RainbowKit, Privy, or Turnkey
 
-The demo ships with two interchangeable wallet backends. A single config key
-picks which one mounts — **everything downstream is unchanged** because the
-on-chain layer (`src/contract/hooks.ts`) talks only to wagmi, and both backends
-provide a wagmi connector.
+The demo ships with three interchangeable wallet backends. Config keys pick
+which one mounts — **everything downstream is unchanged** because the on-chain
+layer (`src/contract/hooks.ts`) talks only to wagmi. `walletBackend()` in
+`src/runtimeConfig.ts` resolves the choice (Turnkey > Privy > RainbowKit).
 
-| `VITE_PRIVY_APP_ID`  | Wallet backend | Connect UX                                                  |
-|----------------------|----------------|-------------------------------------------------------------|
-| _unset_ (default)    | RainbowKit     | MetaMask / Coinbase / Phantom / WalletConnect modal         |
-| set (`cmxxxx…`)      | Privy          | Privy login (email / social / external wallet) + embedded wallet |
+| Config                                              | Backend    | Connect UX                                                  |
+|-----------------------------------------------------|------------|-------------------------------------------------------------|
+| _none_ (default)                                    | RainbowKit | MetaMask / Coinbase / Phantom / WalletConnect modal         |
+| `VITE_PRIVY_APP_ID`                                 | Privy      | Privy login (email / social / external wallet) + embedded wallet |
+| `VITE_TURNKEY_ORG_ID` + `VITE_TURNKEY_AUTH_PROXY_CONFIG_ID` | Turnkey | Turnkey login (email OTP / passkey / OAuth) + embedded wallet |
+
+Privy and Turnkey both provision an embedded wallet on Polygon and run the
+normal approve → `createPosition` → `requestClose` flow against it.
+
+### Wallet-type detection
+
+Whatever a backend connects — a plain EOA, a Gnosis Safe (1-of-1), a Polymarket
+deposit wallet, or another smart-contract account — `useWalletKind`
+(`src/contract/useWalletKind.ts`) classifies it from on-chain code (+ a
+`getOwners()` probe) and routes the opening flow automatically:
+
+| Detected             | Flow                                                                 |
+|----------------------|----------------------------------------------------------------------|
+| EOA                  | Direct `approve` + `createPosition`.                                  |
+| Gnosis Safe / other contract | Direct flow — the wallet's own provider relays the vault calls, so the contract is `msg.sender`. The quote's `wallet_address` is the connected (contract) address. |
+| Polymarket deposit wallet | Auto-enables the push-funded relayer batch (a direct `approve` is blocked for these). Shown as a toggle so the owner can fall back to trading as the EOA. |
+
+The detected type is shown as a badge in the header. This replaces the old
+manual "Use Deposit Wallet" toggle with automatic routing.
 
 ### Using Privy
 
@@ -116,21 +138,78 @@ provide a wagmi connector.
 
 3. Click **Connect wallet** — you'll get Privy's login modal instead of
    RainbowKit. After login, Privy provisions an embedded wallet (for users
-   without one) on Polygon, and the normal approve → `createPosition` →
-   `requestClose` flow runs against it with no other changes.
+   without one) on Polygon.
+
+Privy supports two on-chain flows. Which one runs is detected automatically (the
+header shows a badge for the active wallet type):
+
+**EOA flow (default).** The embedded wallet is a plain EOA. `msg.sender` is that
+EOA, and the standard `approve` → `createPosition` → `requestClose` runs against
+it — identical to any externally-connected EOA. Nothing special.
+
+**Smart-wallet flow (Account Abstraction).** If you enable **Smart wallets** in
+the Privy dashboard, a logged-in user also gets an ERC-4337 smart account, and
+that contract becomes `msg.sender`:
+
+- Auth/quotes are scoped to the **smart-account address** (not the owner EOA),
+  exactly like deposit-wallet mode — see `smartWalletAddress` in `store/auth.ts`.
+- Opening a position is a **single batched userOperation** (`approve` +
+  `createPosition`) via the smart-wallet client; closing is one `requestClose`
+  userOp. See `contract/smartWalletHooks.ts`.
+- The faucet and balance display follow the smart account, so test USDC is
+  minted there (`contract/hooks.ts` `useMintSandboxUsdc`).
+
+Dashboard setup for AA:
+
+1. Enable **Smart wallets** and choose an implementation (Kernel, Safe, …).
+2. Set a **bundler URL**. Use a keyed Pimlico endpoint —
+   `https://api.pimlico.io/v2/137/rpc?apikey=<key>` — **not** the public
+   `public.pimlico.io` one, which blocks browser CORS.
+3. Optionally attach a **paymaster / sponsorship policy** for gasless. Without
+   one, the smart account pays its own gas, so fund it with a little POL before
+   the first open (the first userOp also deploys the account). Its USDC
+   collateral comes from the faucet.
 
 The account pill opens a dropdown (address + copy, USDC balance, **Fund
 wallet**, **Export wallet key** for embedded wallets, **Disconnect**) wired to
 Privy's hooks (`useFundWallet`, `useExportWallet`).
 
+### Using Turnkey
+
+Turnkey needs two ids from the [dashboard](https://dashboard.turnkey.com): your
+**Organization ID** and a **WalletKit / Auth Proxy config ID** (enable Auth
+Proxy and pick auth methods — email OTP, passkey, OAuth — first).
+
+```bash
+VITE_TURNKEY_ORG_ID=<org-uuid> \
+VITE_TURNKEY_AUTH_PROXY_CONFIG_ID=<config-uuid> \
+npm run dev
+# or add both to .env.local
+```
+
+Click **Connect wallet** for Turnkey's login modal. After login the app derives
+a viem account from the user's Ethereum wallet account and the rest of the flow
+is identical.
+
+Unlike Privy, **Turnkey ships no wagmi connector**, so the demo includes a small
+custom one:
+
+- `src/turnkey/provider.ts` — wraps the Turnkey viem account in an EIP-1193
+  provider (delegates signing/sending to a viem walletClient, reads fall through
+  to the RPC).
+- `src/turnkey/connector.ts` — the wagmi connector, fed by a module-level holder.
+- `src/WalletProviders.tsx` (`TurnkeyBridge`) — on login, builds the account via
+  `@turnkey/viem` `createAccount`, populates the holder, and connects wagmi; on
+  logout it clears and disconnects.
+
 ### How the switch is wired
 
 | File                            | Role                                                                                  |
 |---------------------------------|---------------------------------------------------------------------------------------|
-| `src/runtimeConfig.ts`          | `getPrivyAppId()` / `isPrivyMode()` — the single source of truth for the switch.      |
-| `src/WalletProviders.tsx`       | Mounts either the RainbowKit stack or `PrivyProvider` + `@privy-io/wagmi` accordingly. |
-| `src/config.privy.ts`           | Privy's wagmi config (same chain/transport as `config.ts`, no manual connectors).     |
-| `src/components/ConnectControls.tsx` | One connect UI with both backends; the connected-state Privy account menu.        |
+| `src/runtimeConfig.ts`          | `walletBackend()` — the single source of truth (Turnkey > Privy > RainbowKit).        |
+| `src/WalletProviders.tsx`       | Mounts the RainbowKit, Privy, or Turnkey provider stack accordingly.                   |
+| `src/config.privy.ts` / `src/config.turnkey.ts` | Each backend's wagmi config (same chain/transport as `config.ts`).    |
+| `src/components/ConnectControls.tsx` | One connect UI for all three backends; shared `AccountMenuShell` dropdown.        |
 
 Because the mode is fixed at page load (a settings change forces a reload),
 the backend never flips between renders, so the per-backend hooks stay stable.

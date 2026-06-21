@@ -44,12 +44,17 @@ function MarketsTitle({ count }: { count?: number }) {
 }
 
 function App() {
-  const { isConnected } = useAccount()
+  const { isConnected: wagmiConnected } = useAccount()
   useAutoAuth()
   usePositionSocket()
   useMarketSocket()
   useSeedLiveMarkets()
   const jwt = useAuthStore((s) => s.jwt)
+  const smartWalletAddress = useAuthStore((s) => s.smartWalletAddress)
+  // A Privy AA smart wallet counts as connected even when the owner EOA isn't
+  // wired into wagmi — otherwise the header/hero gate on wagmi alone, so the
+  // pre-connect Hero stays up while markets (gated on the JWT) render below.
+  const isConnected = wagmiConnected || smartWalletAddress != null
   const hasApiKey = Boolean(getApiKey())
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   const [marketCount, setMarketCount] = useState<number | undefined>(undefined)
@@ -87,7 +92,7 @@ function App() {
           </div>
         )}
 
-        {jwt && (
+        {isConnected && jwt && (
           <>
             <div>
               <MarketsTitle count={marketCount} />

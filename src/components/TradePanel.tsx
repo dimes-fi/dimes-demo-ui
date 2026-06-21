@@ -20,6 +20,7 @@ import {
   USDC_ADDRESS,
 } from '../contract/hooks'
 import { useCreatePositionPushFunded } from '../contract/pushFundedHooks'
+import { useCreatePositionSmart } from '../contract/smartWalletHooks'
 import { useAuthStore } from '../store/auth'
 import { quoteErrorHint, hintAdjustment, type CorrectedField } from '../api/quote-error-hints'
 import { maxViableLeverageBps } from '../utils/capacity'
@@ -163,12 +164,15 @@ export function TradePanel({
     receiptError: approveReceiptError,
     reset: resetApprove,
   } = useApproveUsdc()
-  // Deposit-wallet mode routes position creation through the push-funded
-  // relayer batch instead of a direct `createPosition` transaction.
+  // Routing: a Privy AA smart wallet batches approve+createPosition in one
+  // userOp; a Polymarket deposit wallet uses the push-funded relayer batch;
+  // otherwise a direct createPosition. Smart-wallet mode wins when active.
   const depositWalletMode = useAuthStore((s) => s.depositWalletMode)
+  const smartWalletMode = useAuthStore((s) => s.smartWalletAddress != null)
   const eoaCreate = useCreatePosition()
   const pushFundedCreate = useCreatePositionPushFunded()
-  const activeCreate = depositWalletMode ? pushFundedCreate : eoaCreate
+  const smartCreate = useCreatePositionSmart()
+  const activeCreate = smartWalletMode ? smartCreate : depositWalletMode ? pushFundedCreate : eoaCreate
   const create = activeCreate.create
   const createPending = activeCreate.isPending
   const createConfirming = activeCreate.isConfirming
@@ -189,8 +193,9 @@ export function TradePanel({
 
   const requiredApproval = draft ? BigInt(draft.totalUserAmountUsdcUnits) : 0n
   const hasAllowance = allowance !== undefined && allowance >= requiredApproval && requiredApproval > 0n
-  // Deposit-wallet mode pushes funds inside the batch, so no ERC-20 approval is needed.
-  const canCreate = depositWalletMode || hasAllowance || approveSuccess
+  // Deposit-wallet and AA modes fund/approve inside the batch, so no separate
+  // ERC-20 approval step is needed.
+  const canCreate = smartWalletMode || depositWalletMode || hasAllowance || approveSuccess
 
   const canGetQuote = isConnected && collateralUsd && Number(collateralUsd) > 0
 

@@ -38,6 +38,8 @@ export const ENVIRONMENTS: Record<
 const ENV_KEY = 'dimes.env'
 const KEY_KEY = 'dimes.apiKey'
 const PRIVY_KEY = 'dimes.privyAppId'
+const TK_ORG_KEY = 'dimes.turnkeyOrgId'
+const TK_PROXY_KEY = 'dimes.turnkeyAuthProxyConfigId'
 
 function ss(): Storage | null {
   try {
@@ -117,9 +119,51 @@ export function getPrivyAppId(): string {
   return ((import.meta.env.VITE_PRIVY_APP_ID as string | undefined) ?? '').trim()
 }
 
-/** True when a Privy app id is configured, so the UI should use Privy. */
+/**
+ * Turnkey org id + auth-proxy (WalletKit) config id. Both are required to run
+ * the Turnkey wallet stack; either missing falls back to the next backend.
+ * Both are public client identifiers, not secrets.
+ */
+export function getTurnkeyOrgId(): string {
+  const stored = ss()?.getItem(TK_ORG_KEY)
+  if (stored != null) return stored.trim()
+  return ((import.meta.env.VITE_TURNKEY_ORG_ID as string | undefined) ?? '').trim()
+}
+
+export function getTurnkeyAuthProxyConfigId(): string {
+  const stored = ss()?.getItem(TK_PROXY_KEY)
+  if (stored != null) return stored.trim()
+  return ((import.meta.env.VITE_TURNKEY_AUTH_PROXY_CONFIG_ID as string | undefined) ?? '').trim()
+}
+
+/** Optional Turnkey API base URL; defaults to Turnkey's public API. */
+export function getTurnkeyApiBaseUrl(): string {
+  return (
+    (import.meta.env.VITE_TURNKEY_API_BASE_URL as string | undefined) ?? 'https://api.turnkey.com'
+  ).trim()
+}
+
+export type WalletBackend = 'rainbowkit' | 'privy' | 'turnkey'
+
+/**
+ * Which wallet stack mounts. Turnkey wins when fully configured, then Privy,
+ * else the default RainbowKit stack. Fixed for the page's lifetime — a settings
+ * change forces a reload — so the choice never flips between renders.
+ */
+export function walletBackend(): WalletBackend {
+  if (getTurnkeyOrgId() && getTurnkeyAuthProxyConfigId()) return 'turnkey'
+  if (getPrivyAppId()) return 'privy'
+  return 'rainbowkit'
+}
+
+/** True when a Privy app id is configured (and Turnkey isn't taking priority). */
 export function isPrivyMode(): boolean {
-  return getPrivyAppId().length > 0
+  return walletBackend() === 'privy'
+}
+
+/** True when Turnkey is fully configured, so the UI should use Turnkey. */
+export function isTurnkeyMode(): boolean {
+  return walletBackend() === 'turnkey'
 }
 
 /**

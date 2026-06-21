@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useDisconnect, useAccount, useBalance } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
-import { useDepositWallet } from '../contract/useDepositWallet'
+import { useWalletKind } from '../contract/useWalletKind'
 import { useMintSandboxUsdc } from '../contract/hooks'
 import { ConnectControls } from './ConnectControls'
 import { useToastStore } from '../store/toasts'
@@ -24,7 +24,11 @@ function CompactConnectButton() {
 const USDC_ADDRESS = getUsdcAddress()
 
 function UsdcBalance() {
-  const { address } = useAccount()
+  const { address: eoa } = useAccount()
+  const smartWalletAddress = useAuthStore((s) => s.smartWalletAddress)
+  // Show the balance of the wallet positions actually open from — the smart
+  // account when AA is active, else the connected EOA.
+  const address = (smartWalletAddress ?? eoa) as `0x${string}` | undefined
   const { data } = useBalance({
     address,
     token: USDC_ADDRESS,
@@ -76,8 +80,11 @@ function MintUsdcButton() {
   const busy = isPending || isConfirming
 
   // Pop the button when the wallet has no collateral — that's exactly when a
-  // user needs the faucet to do anything.
-  const { address } = useAccount()
+  // user needs the faucet to do anything. Checks the effective wallet (smart
+  // account under AA), which is where the faucet now mints.
+  const { address: eoa } = useAccount()
+  const smartWalletAddress = useAuthStore((s) => s.smartWalletAddress)
+  const address = (smartWalletAddress ?? eoa) as `0x${string}` | undefined
   const { data: balance } = useBalance({
     address,
     token: USDC_ADDRESS,
@@ -142,89 +149,137 @@ function MintUsdcButton() {
  * connected wallet has no deposit wallet, a disabled placeholder is shown so
  * the capability is still discoverable.
  */
-function DepositWalletToggle() {
-  const { available, address: depositWalletAddress, isLoading, chainSupported } = useDepositWallet()
+/**
+ * Detects the connected wallet's type and routes the opening flow automatically:
+ *
+ * - A deployed Polymarket deposit wallet → auto-enables the push-funded relayer
+ *   flow (the one case a direct `approve` can't satisfy). Stays a toggle so the
+ *   owner can fall back to trading as a plain EOA.
+ * - EOA / Gnosis Safe / other smart-contract wallet → the direct flow already
+ *   works (the wallet's own provider relays the vault calls), so this just shows
+ *   the detected type as a static badge.
+ */
+function WalletKindBadge() {
+  const { kind, isLoading, depositWalletAddress, label } = useWalletKind()
   const depositWalletMode = useAuthStore((s) => s.depositWalletMode)
   const setDepositWalletMode = useAuthStore((s) => s.setDepositWalletMode)
+  const smartWalletAddress = useAuthStore((s) => s.smartWalletAddress)
+  const { address } = useAccount()
 
-  // The deposit-wallet flow only exists on Polygon mainnet.
-  if (!chainSupported) return null
+  // Auto-enable the push-funded flow once per address when a deposit wallet is
+  // detected. Tracking the applied address lets the user toggle back off without
+  // the effect immediately re-enabling it.
+  const autoAppliedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (kind === 'deposit-owner' && depositWalletAddress && autoAppliedFor.current !== address) {
+      autoAppliedFor.current = address ?? null
+      if (!depositWalletMode) setDepositWalletMode(true, depositWalletAddress)
+    }
+    if (!address) autoAppliedFor.current = null
+  }, [kind, depositWalletAddress, address, depositWalletMode, setDepositWalletMode])
 
-  if (isLoading || !available || !depositWalletAddress) {
+  const baseBadge: React.CSSProperties = {
+    padding: '6px 12px',
+    fontSize: 12,
+    fontWeight: 600,
+    borderRadius: 0,
+    fontFamily: 'var(--font)',
+    lineHeight: 1.2,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+  }
+  const dot = (color: string): React.CSSProperties => ({
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+    background: color,
+  })
+
+  // A Privy AA smart account is the on-chain wallet — takes priority over the
+  // wagmi-address-based detection (which would see the embedded owner EOA).
+  if (smartWalletAddress) {
     return (
       <span
-        title={
-          isLoading
-            ? 'Checking for a Polymarket deposit wallet…'
-            : 'No Polymarket deposit wallet is deployed for the connected wallet. The push-funded flow is unavailable.'
-        }
+        title={`Privy smart account (ERC-4337). Positions open as a single gasless userOp, with ${smartWalletAddress} as msg.sender.`}
         style={{
-          padding: '6px 12px',
-          fontSize: 12,
-          fontWeight: 600,
-          borderRadius: 0,
-          border: '1px dashed var(--border)',
-          background: 'transparent',
-          color: 'var(--text-dim)',
-          fontFamily: 'var(--font)',
-          lineHeight: 1.2,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
+          ...baseBadge,
+          border: '1px solid var(--green-border)',
+          background: 'var(--green-soft)',
+          color: 'var(--green)',
           cursor: 'help',
         }}
       >
-        <span
-          style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--text-dim)', opacity: 0.5 }}
-        />
-        {isLoading ? 'Checking deposit wallet…' : 'No Deposit Wallet'}
+        <span style={dot('var(--green)')} />
+        {`Smart Account (AA) · ${shortenAddress(smartWalletAddress)}`}
       </span>
     )
   }
 
-  const toggle = () => {
-    if (depositWalletMode) {
-      setDepositWalletMode(false, null)
-    } else {
-      setDepositWalletMode(true, depositWalletAddress)
-    }
+  if (isLoading) {
+    return (
+      <span
+        title="Detecting wallet type…"
+        style={{ ...baseBadge, border: '1px dashed var(--border)', color: 'var(--text-dim)', cursor: 'help' }}
+      >
+        <span style={dot('var(--text-dim)')} />
+        Detecting wallet…
+      </span>
+    )
   }
 
+  // Deposit-wallet owner → push-funded toggle (yellow when active).
+  if (kind === 'deposit-owner' && depositWalletAddress) {
+    const toggle = () =>
+      depositWalletMode
+        ? setDepositWalletMode(false, null)
+        : setDepositWalletMode(true, depositWalletAddress)
+    return (
+      <button
+        type="button"
+        onClick={toggle}
+        title={
+          depositWalletMode
+            ? `Push-funded flow active — quotes and positions scoped to deposit wallet ${depositWalletAddress}. Click to trade as the owner EOA instead.`
+            : `A Polymarket deposit wallet (${depositWalletAddress}) is available. Click to route through the push-funded flow.`
+        }
+        style={{
+          ...baseBadge,
+          border: `1px solid ${depositWalletMode ? 'var(--yellow)' : 'var(--border)'}`,
+          background: depositWalletMode ? 'var(--yellow)' : 'var(--surface-subtle)',
+          color: depositWalletMode ? 'var(--yellow-ink)' : 'var(--text)',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={dot(depositWalletMode ? 'var(--yellow-ink)' : 'var(--text-dim)')} />
+        {depositWalletMode
+          ? `Deposit Wallet · ${shortenAddress(depositWalletAddress)}`
+          : 'EOA · deposit wallet available'}
+      </button>
+    )
+  }
+
+  // EOA / Safe / other smart-contract wallet → static type badge. Contract
+  // wallets get a subtle accent to show the demo recognized them.
+  const isContract = kind === 'safe' || kind === 'smart-contract'
   return (
-    <button
-      type="button"
-      onClick={toggle}
+    <span
       title={
-        depositWalletMode
-          ? `Push-funded flow active — quotes and positions are scoped to deposit wallet ${depositWalletAddress}`
-          : `A Polymarket deposit wallet (${depositWalletAddress}) is available for this wallet. Enable the push-funded flow.`
+        isContract
+          ? `Detected a ${label}. Vault calls are relayed by the wallet — the direct open/close flow runs with this contract as msg.sender.`
+          : 'Plain EOA — direct approve + createPosition flow.'
       }
       style={{
-        padding: '6px 12px',
-        fontSize: 12,
-        fontWeight: 600,
-        borderRadius: 0,
-        border: `1px solid ${depositWalletMode ? 'var(--yellow)' : 'var(--border)'}`,
-        background: depositWalletMode ? 'var(--yellow)' : 'var(--surface-subtle)',
-        color: depositWalletMode ? 'var(--yellow-ink)' : 'var(--text)',
-        cursor: 'pointer',
-        fontFamily: 'var(--font)',
-        lineHeight: 1.2,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
+        ...baseBadge,
+        border: `1px solid ${isContract ? 'var(--border-strong)' : 'var(--border)'}`,
+        background: 'var(--surface-subtle)',
+        color: isContract ? 'var(--text)' : 'var(--text-muted)',
+        cursor: 'help',
       }}
     >
-      <span
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: '50%',
-          background: depositWalletMode ? 'var(--yellow-ink)' : 'var(--text-dim)',
-        }}
-      />
-      {depositWalletMode ? `Deposit Wallet · ${shortenAddress(depositWalletAddress)}` : 'Use Deposit Wallet'}
-    </button>
+      <span style={dot(isContract ? 'var(--green)' : 'var(--text-dim)')} />
+      {label}
+    </span>
   )
 }
 
@@ -393,7 +448,7 @@ export function Header() {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         {hasApiKey && <SettingsControl />}
-        {isConnected && <DepositWalletToggle />}
+        {isConnected && <WalletKindBadge />}
         {isConnected && hasApiKey && isSandbox() && <MintUsdcButton />}
         {isConnected && hasApiKey && <UsdcBalance />}
         {isConnected && (

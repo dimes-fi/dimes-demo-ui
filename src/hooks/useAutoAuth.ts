@@ -17,20 +17,24 @@ export function useAutoAuth() {
   const { setAuth, clearAuth } = useAuthStore();
   const depositWalletMode = useAuthStore((s) => s.depositWalletMode);
   const depositWalletAddress = useAuthStore((s) => s.depositWalletAddress);
+  const smartWalletAddress = useAuthStore((s) => s.smartWalletAddress);
   const displayWallet = useDisplayWallet();
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
-    // In deposit-wallet mode the JWT and quotes must be scoped to the deposit
-    // wallet contract (the on-chain `msg.sender`), not the connected owner EOA.
+    // For a smart wallet (AA) or a deposit wallet, the JWT and quotes must be
+    // scoped to that contract — the on-chain `msg.sender` — not the connected
+    // signer/owner EOA.
     const connectedAddress = isConnected && address ? address : undefined;
-    // Display-wallet override: when set, mint the JWT for it so
-    // positions/quotes/socket all follow it. Takes precedence over everything.
+    // Precedence: display-wallet override > smart account > deposit wallet >
+    // connected wallet.
     const effectiveAddress = displayWallet
       ? displayWallet
-      : depositWalletMode && depositWalletAddress
-        ? depositWalletAddress
-        : connectedAddress;
+      : smartWalletAddress
+        ? smartWalletAddress
+        : depositWalletMode && depositWalletAddress
+          ? depositWalletAddress
+          : connectedAddress;
 
     function clearTimer() {
       if (refreshTimer.current) {
@@ -74,5 +78,14 @@ export function useAutoAuth() {
     }
 
     return clearTimer;
-  }, [isConnected, address, depositWalletMode, depositWalletAddress, displayWallet, setAuth, clearAuth]);
+  }, [
+    isConnected,
+    address,
+    depositWalletMode,
+    depositWalletAddress,
+    smartWalletAddress,
+    displayWallet,
+    setAuth,
+    clearAuth,
+  ]);
 }

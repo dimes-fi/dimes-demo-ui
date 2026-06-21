@@ -7,7 +7,7 @@ import {
   useAccount,
   useChainId,
 } from 'wagmi';
-import { parseGwei, getAddress, type PublicClient, type TransactionReceipt } from 'viem';
+import { parseGwei, getAddress, encodeFunctionData, type PublicClient, type TransactionReceipt } from 'viem';
 import { vaultAbi, erc20Abi } from './abi';
 import {
   recoverCreatePositionSigner,
@@ -15,6 +15,8 @@ import {
 } from './verifySignature';
 import { useContractInfo } from '../hooks/useContractInfo';
 import { getUsdcAddress } from '../runtimeConfig';
+import { useAuthStore } from '../store/auth';
+import { getSmartWalletClient } from './smartWalletClient';
 import type { Offer } from '../api/types';
 
 const POLYGON_AMOY_CHAIN_ID = 80002;
@@ -141,42 +143,100 @@ export function useMintSandboxUsdc() {
   } = useWaitForTransactionReceipt({ hash, pollingInterval: 2_000 });
   const publicClient = usePublicClient();
   const { address: account } = useAccount();
+  const smartWalletAddress = useAuthStore((s) => s.smartWalletAddress);
   const gasOverrides = useGasOverrides();
   const [simulateError, setSimulateError] = useState<unknown>(null);
   const revertError = useRevertError(receipt);
+  // Smart-wallet mint runs through the AA client (own state, not wagmi's).
+  const [smartPending, setSmartPending] = useState(false);
+  const [smartConfirming, setSmartConfirming] = useState(false);
+  const [smartSuccess, setSmartSuccess] = useState(false);
+  const [smartHash, setSmartHash] = useState<`0x${string}` | null>(null);
 
   const reset = () => {
     setSimulateError(null);
+    setSmartPending(false);
+    setSmartConfirming(false);
+    setSmartSuccess(false);
+    setSmartHash(null);
     resetWrite();
   };
 
   const mint = async (amountUsdc: bigint = DEFAULT_MINT_USDC) => {
     setSimulateError(null);
-    if (!account) {
+    // Collateral must land in the wallet that opens the position — the smart
+    // account when AA is active, else the connected EOA.
+    const recipient = (smartWalletAddress ?? account) as `0x${string}` | undefined;
+    if (!recipient) {
       setSimulateError(new Error('Wallet not connected.'));
       return;
     }
-    const params = {
+    const mintData = {
       address: USDC_ADDRESS,
       abi: erc20Abi,
       functionName: 'mint' as const,
-      args: [account, amountUsdc * 1_000_000n] as const,
+      args: [recipient, amountUsdc * 1_000_000n] as const,
     };
 
+    // AA: mint *through* the smart account (it holds the gas) to itself.
+    if (smartWalletAddress) {
+      const client = getSmartWalletClient();
+      if (!client) {
+        setSimulateError(new Error('Smart wallet not ready.'));
+        return;
+      }
+      setSmartSuccess(false);
+      setSmartPending(true);
+      let txHash: `0x${string}`;
+      try {
+        txHash = await client.sendTransaction({
+          account: client.account,
+          calls: [{ to: USDC_ADDRESS, data: encodeFunctionData(mintData), value: 0n }],
+        });
+      } catch (e) {
+        setSimulateError(e);
+        setSmartPending(false);
+        return;
+      }
+      setSmartHash(txHash);
+      setSmartPending(false);
+      setSmartConfirming(true);
+      try {
+        const r = await publicClient!.waitForTransactionReceipt({ hash: txHash });
+        if (r.status === 'success') setSmartSuccess(true);
+        else setSimulateError(new Error('Mint reverted on-chain.'));
+      } catch (e) {
+        setSimulateError(e);
+      } finally {
+        setSmartConfirming(false);
+      }
+      return;
+    }
+
     try {
-      await publicClient!.simulateContract({ ...params, account });
+      await publicClient!.simulateContract({ ...mintData, account: recipient });
     } catch (e) {
       setSimulateError(e);
       return;
     }
 
-    writeContract({ ...params, ...gasOverrides });
+    writeContract({ ...mintData, ...gasOverrides });
   };
 
-  const isSuccess = receiptFetched && receipt?.status === 'success';
+  const isSuccess = (receiptFetched && receipt?.status === 'success') || smartSuccess;
   const receiptError = receiptFetchError ?? revertError;
 
-  return { mint, hash, isPending, isConfirming, isSuccess, error, receiptError, simulateError, reset };
+  return {
+    mint,
+    hash: hash ?? smartHash,
+    isPending: isPending || smartPending,
+    isConfirming: isConfirming || smartConfirming,
+    isSuccess,
+    error,
+    receiptError,
+    simulateError,
+    reset,
+  };
 }
 
 export function useCheckAllowance(

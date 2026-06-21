@@ -1,24 +1,32 @@
 import { useEffect, useRef, useState } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { usePrivy, useFundWallet, useExportWallet } from '@privy-io/react-auth'
+import { useTurnkey, AuthState } from '@turnkey/react-wallet-kit'
 import { useAccount, useBalance, useChainId, useSwitchChain } from 'wagmi'
 import { formatUnits } from 'viem'
-import { getUsdcAddress, isPrivyMode } from '../runtimeConfig'
+import { getUsdcAddress, walletBackend } from '../runtimeConfig'
 import { useDisplayWallet } from '../hooks/useDisplayWallet'
+import { useAuthStore } from '../store/auth'
 
 // ---------------------------------------------------------------------------
 // CONNECT CONTROLS
 //
-// One wallet-connect UI with two interchangeable backends, chosen by
-// isPrivyMode() (driven by VITE_PRIVY_APP_ID). The mode is fixed for the page's
-// lifetime — a settings change forces a full reload — so the top-level branch
-// below never flips between renders and the per-backend hooks stay stable.
+// One wallet-connect UI with three interchangeable backends, chosen by
+// walletBackend() (RainbowKit / Privy / Turnkey). The mode is fixed for the
+// page's lifetime — a settings change forces a full reload — so the top-level
+// branch below never flips between renders and the per-backend hooks stay
+// stable.
 //
 // `compact` renders the small header pill; the default is the larger Hero CTA.
-// Both backends produce the same three-state layout: connect → wrong-network →
-// connected (chain + account). Downstream everything reads wagmi, so the
-// on-chain flow doesn't care which backend connected the wallet.
+// Downstream everything reads wagmi, so the on-chain flow doesn't care which
+// backend connected the wallet.
 // ---------------------------------------------------------------------------
+
+interface MenuAction {
+  label: string
+  onClick: () => void
+  danger?: boolean
+}
 
 function shorten(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
@@ -44,7 +52,14 @@ function btnStyle(compact: boolean): React.CSSProperties {
 }
 
 export function ConnectControls({ compact = false }: { compact?: boolean }) {
-  return isPrivyMode() ? <PrivyControls compact={compact} /> : <RainbowControls compact={compact} />
+  switch (walletBackend()) {
+    case 'turnkey':
+      return <TurnkeyControls compact={compact} />
+    case 'privy':
+      return <PrivyControls compact={compact} />
+    default:
+      return <RainbowControls compact={compact} />
+  }
 }
 
 function RainbowControls({ compact }: { compact: boolean }) {
@@ -130,11 +145,16 @@ function PrivyControls({ compact }: { compact: boolean }) {
   const chainId = useChainId()
   const { chains, switchChain } = useSwitchChain()
   const displayWallet = useDisplayWallet()
+  const smartWalletAddress = useAuthStore((s) => s.smartWalletAddress)
   const base = btnStyle(compact)
 
+  // With an AA smart wallet the owner EOA may not be wired into wagmi, so fall
+  // back to the smart-account address for the connected state + pill.
+  const activeAddress = (address ?? smartWalletAddress ?? undefined) as `0x${string}` | undefined
   const expectedChainId = chains[0]?.id
-  const connected = ready && authenticated && !!address
-  const wrongNetwork = connected && expectedChainId != null && chainId !== expectedChainId
+  const connected = ready && authenticated && !!activeAddress
+  // Chain check only applies when wagmi actually has the account wired up.
+  const wrongNetwork = connected && !!address && expectedChainId != null && chainId !== expectedChainId
 
   return (
     <div
@@ -185,7 +205,11 @@ function PrivyControls({ compact }: { compact: boolean }) {
             <button type="button" style={{ ...base, cursor: 'default' }} disabled>
               {chain?.name ?? 'Polygon'}
             </button>
-            <PrivyAccountMenu address={address!} label={shorten(displayWallet ?? address!)} base={base} />
+            <PrivyAccountMenu
+              address={activeAddress!}
+              label={shorten(displayWallet ?? activeAddress!)}
+              base={base}
+            />
           </>
         )
       })()}
@@ -196,23 +220,22 @@ function PrivyControls({ compact }: { compact: boolean }) {
 const USDC_ADDRESS = getUsdcAddress()
 
 /**
- * Account pill (our styling) that opens a small dropdown over Privy's *typed*
- * actions — full address + copy, USDC balance, fund, export (embedded wallets
- * only), disconnect. Deliberately not Privy's WalletsDialog: that has no public
- * open trigger, so we reproduce its contents to keep the app's squared look.
+ * Account pill (our styling) that opens a small dropdown: full address + copy,
+ * USDC balance, then backend-specific actions (fund / export / disconnect).
+ * Shared by Privy and Turnkey so both keep the app's squared look without
+ * depending on either SDK's own account UI.
  */
-function PrivyAccountMenu({
+function AccountMenuShell({
   address,
   label,
   base,
+  actions,
 }: {
   address: `0x${string}`
   label: string
   base: React.CSSProperties
+  actions: MenuAction[]
 }) {
-  const { user, logout } = usePrivy()
-  const { fundWallet } = useFundWallet()
-  const { exportWallet } = useExportWallet()
   const { data: balance } = useBalance({
     address,
     token: USDC_ADDRESS,
@@ -221,9 +244,6 @@ function PrivyAccountMenu({
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
-
-  // Export only applies to Privy embedded wallets; external wallets keep keys.
-  const isEmbedded = user?.wallet?.walletClientType === 'privy'
 
   useEffect(() => {
     if (!open) return
@@ -298,40 +318,114 @@ function PrivyAccountMenu({
                 : '—'}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false)
-              void fundWallet({ address })
-            }}
-            style={itemStyle}
-          >
-            Fund wallet
-          </button>
-          {isEmbedded && (
+          {actions.map((a, i) => (
             <button
+              key={a.label}
               type="button"
               onClick={() => {
                 setOpen(false)
-                void exportWallet({ address })
+                a.onClick()
               }}
-              style={itemStyle}
+              style={{
+                ...itemStyle,
+                color: a.danger ? 'var(--red)' : 'var(--text)',
+                borderTop: i === actions.length - 1 ? '1px solid var(--border)' : undefined,
+              }}
             >
-              Export wallet key
+              {a.label}
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false)
-              void logout()
-            }}
-            style={{ ...itemStyle, color: 'var(--red)', borderTop: '1px solid var(--border)' }}
-          >
-            Disconnect
-          </button>
+          ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function PrivyAccountMenu({
+  address,
+  label,
+  base,
+}: {
+  address: `0x${string}`
+  label: string
+  base: React.CSSProperties
+}) {
+  const { user, logout } = usePrivy()
+  const { fundWallet } = useFundWallet()
+  const { exportWallet } = useExportWallet()
+
+  // Export only applies to Privy embedded wallets; external wallets keep keys.
+  const isEmbedded = user?.wallet?.walletClientType === 'privy'
+
+  // Logout = Privy logout() only. The SmartWalletBridge tears down wagmi + the
+  // scoped auth once Privy flips to unauthenticated (doing it here would
+  // interrupt logout and leave Privy half-logged-in).
+  const actions: MenuAction[] = [
+    { label: 'Fund wallet', onClick: () => void fundWallet({ address }) },
+    ...(isEmbedded
+      ? [{ label: 'Export wallet key', onClick: () => void exportWallet({ address }) }]
+      : []),
+    { label: 'Disconnect', onClick: () => void logout(), danger: true },
+  ]
+
+  return <AccountMenuShell address={address} label={label} base={base} actions={actions} />
+}
+
+// react-wallet-kit's published context type omits `logout` (the runtime exposes
+// it), so reach it through a narrow cast.
+interface TurnkeyLogout {
+  logout?: () => Promise<void>
+}
+
+function TurnkeyControls({ compact }: { compact: boolean }) {
+  const tk = useTurnkey()
+  const { authState, handleLogin, wallets } = tk
+  const { address } = useAccount()
+  const displayWallet = useDisplayWallet()
+  const base = btnStyle(compact)
+
+  const connected = authState === AuthState.Authenticated && !!address
+
+  if (!connected) {
+    return (
+      <div style={{ display: 'inline-flex', gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => void handleLogin()}
+          style={{
+            ...base,
+            background: 'var(--yellow)',
+            color: 'var(--yellow-ink)',
+            borderColor: 'var(--yellow)',
+            fontWeight: 700,
+          }}
+        >
+          Connect wallet
+        </button>
+      </div>
+    )
+  }
+
+  const walletId = wallets?.[0]?.walletId
+  const logout = (tk as unknown as TurnkeyLogout).logout
+  const actions: MenuAction[] = [
+    ...(walletId
+      ? [{ label: 'Export wallet key', onClick: () => void tk.handleExportWallet({ walletId }) }]
+      : []),
+    { label: 'Disconnect', onClick: () => void logout?.(), danger: true },
+  ]
+
+  return (
+    <div style={{ display: 'inline-flex', gap: 8 }}>
+      <button type="button" style={{ ...base, cursor: 'default' }} disabled>
+        Polygon
+      </button>
+      <AccountMenuShell
+        address={address!}
+        label={shorten(displayWallet ?? address!)}
+        base={base}
+        actions={actions}
+      />
     </div>
   )
 }
