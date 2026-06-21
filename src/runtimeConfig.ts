@@ -37,6 +37,7 @@ export const ENVIRONMENTS: Record<
 
 const ENV_KEY = 'dimes.env'
 const KEY_KEY = 'dimes.apiKey'
+const PRIVY_KEY = 'dimes.privyAppId'
 
 function ss(): Storage | null {
   try {
@@ -103,6 +104,25 @@ export function getApiKey(): string {
 }
 
 /**
+ * Privy app id. When set, the UI swaps its RainbowKit wallet stack for Privy
+ * (embedded wallets + Privy login) — the on-chain create/close flow is
+ * unchanged because it all runs through wagmi, and Privy provides a wagmi
+ * connector. Empty/unset means the default RainbowKit wallet stack.
+ *
+ * Precedence mirrors getApiKey: sessionStorage override > build-time env.
+ */
+export function getPrivyAppId(): string {
+  const stored = ss()?.getItem(PRIVY_KEY)
+  if (stored != null) return stored.trim()
+  return ((import.meta.env.VITE_PRIVY_APP_ID as string | undefined) ?? '').trim()
+}
+
+/** True when a Privy app id is configured, so the UI should use Privy. */
+export function isPrivyMode(): boolean {
+  return getPrivyAppId().length > 0
+}
+
+/**
  * Infer the environment from an API key's prefix. Sandbox keys are
  * `dm_sbx_…`, production keys are `dm_live_…`. Returns null for anything
  * unrecognized (caller falls back to the current environment).
@@ -119,7 +139,11 @@ export function detectEnvFromKey(apiKey: string): DimesEnv | null {
  * re-initializes against the new values (the environment switch pins the API
  * base / token address at load). Omitting a field leaves it untouched.
  */
-export function applySettings(opts: { environment?: DimesEnv; apiKey?: string }): void {
+export function applySettings(opts: {
+  environment?: DimesEnv
+  apiKey?: string
+  privyAppId?: string
+}): void {
   const s = ss()
   if (!s) return
   if (opts.environment) s.setItem(ENV_KEY, opts.environment)
@@ -127,6 +151,11 @@ export function applySettings(opts: { environment?: DimesEnv; apiKey?: string })
     const trimmed = opts.apiKey.trim()
     if (trimmed) s.setItem(KEY_KEY, trimmed)
     else s.removeItem(KEY_KEY)
+  }
+  if (opts.privyAppId !== undefined) {
+    const trimmed = opts.privyAppId.trim()
+    if (trimmed) s.setItem(PRIVY_KEY, trimmed)
+    else s.removeItem(PRIVY_KEY)
   }
   window.location.reload()
 }

@@ -60,6 +60,7 @@ All config is read from Vite environment variables. See
 | `VITE_RPC_URL`                  | _(unset)_                              | Optional custom RPC endpoint; leave empty to use wagmi's default.                                                                                                                  |
 | `VITE_USDC_ADDRESS`             | _(sandbox mock)_                       | Collateral token the vault accepts. Defaults to the sandbox mock USDC so the demo works out of the box. See [Chains and contracts](#chains-and-contracts) for prod/testnet values. |
 | `VITE_WALLETCONNECT_PROJECT_ID` | _(demo id bundled in `src/config.ts`)_ | Get a free project id at <https://cloud.walletconnect.com> if you fork for production. WalletConnect project ids are public identifiers, not secrets.                              |
+| `VITE_PRIVY_APP_ID`             | _(unset)_                              | When set, swaps the default RainbowKit wallet stack for [Privy](https://privy.io) (embedded wallets + Privy login). See [Wallets: RainbowKit or Privy](#wallets-rainbowkit-or-privy). Privy app ids are public client identifiers, not secrets. |
 | `VITE_API_KEY`                  | _(unset)_                              | ⚠ **Demo-only.** See below.                                                                                                                                                        |
 
 ## Auth: demo vs real ⚠
@@ -89,6 +90,50 @@ integration:
 The `VITE_API_KEY` path exists in this repo purely so the demo runs
 end-to-end with a single command, and the module is commented to make that
 clear.
+
+## Wallets: RainbowKit or Privy
+
+The demo ships with two interchangeable wallet backends. A single config key
+picks which one mounts — **everything downstream is unchanged** because the
+on-chain layer (`src/contract/hooks.ts`) talks only to wagmi, and both backends
+provide a wagmi connector.
+
+| `VITE_PRIVY_APP_ID`  | Wallet backend | Connect UX                                                  |
+|----------------------|----------------|-------------------------------------------------------------|
+| _unset_ (default)    | RainbowKit     | MetaMask / Coinbase / Phantom / WalletConnect modal         |
+| set (`cmxxxx…`)      | Privy          | Privy login (email / social / external wallet) + embedded wallet |
+
+### Using Privy
+
+1. Create an app in the [Privy dashboard](https://dashboard.privy.io) and copy
+   its **App ID** (a public client identifier, not a secret).
+2. Set it and run:
+
+   ```bash
+   VITE_PRIVY_APP_ID=cmxxxxxxxxxxxxxxxxxxxxxxxx npm run dev
+   # or add VITE_PRIVY_APP_ID=… to .env.local
+   ```
+
+3. Click **Connect wallet** — you'll get Privy's login modal instead of
+   RainbowKit. After login, Privy provisions an embedded wallet (for users
+   without one) on Polygon, and the normal approve → `createPosition` →
+   `requestClose` flow runs against it with no other changes.
+
+The account pill opens a dropdown (address + copy, USDC balance, **Fund
+wallet**, **Export wallet key** for embedded wallets, **Disconnect**) wired to
+Privy's hooks (`useFundWallet`, `useExportWallet`).
+
+### How the switch is wired
+
+| File                            | Role                                                                                  |
+|---------------------------------|---------------------------------------------------------------------------------------|
+| `src/runtimeConfig.ts`          | `getPrivyAppId()` / `isPrivyMode()` — the single source of truth for the switch.      |
+| `src/WalletProviders.tsx`       | Mounts either the RainbowKit stack or `PrivyProvider` + `@privy-io/wagmi` accordingly. |
+| `src/config.privy.ts`           | Privy's wagmi config (same chain/transport as `config.ts`, no manual connectors).     |
+| `src/components/ConnectControls.tsx` | One connect UI with both backends; the connected-state Privy account menu.        |
+
+Because the mode is fixed at page load (a settings change forces a reload),
+the backend never flips between renders, so the per-backend hooks stay stable.
 
 ## Where to look
 

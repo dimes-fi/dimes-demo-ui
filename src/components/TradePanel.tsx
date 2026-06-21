@@ -555,6 +555,11 @@ export function TradePanel({
             side={side}
             reasonCode={sideEligibility.reasonCode}
             otherOpen={eligibility[side === 'yes' ? 'no' : 'yes'].open}
+            otherSub={
+              market.prices
+                ? formatCents(side === 'yes' ? market.prices.noBidPriceUsd : market.prices.yesBidPriceUsd)
+                : null
+            }
             onSwitch={() => { setSide(side === 'yes' ? 'no' : 'yes'); clearOffer(); }}
           />
         ) : (<>
@@ -893,44 +898,106 @@ function SideUnavailablePanel({
   side,
   reasonCode,
   otherOpen,
+  otherSub,
   onSwitch,
 }: {
   side: 'yes' | 'no'
   reasonCode: string | null
   otherOpen: boolean
+  otherSub: string | null
   onSwitch: () => void
 }) {
   const otherLabel = side === 'yes' ? 'NO' : 'YES'
+  // The other side carries its own market accent (YES green, NO red) so the
+  // switch CTA reads as "go here next", not as a warning.
+  const otherIsYes = otherLabel === 'YES'
+  const otherAccent = otherIsYes ? 'var(--green)' : 'var(--red)'
+  const otherAccentSoft = otherIsYes ? 'var(--green-soft)' : 'var(--red-soft)'
+  const otherAccentBorder = otherIsYes ? 'var(--green-border)' : 'var(--red-border)'
+
   return (
     <div
       style={{
         marginTop: 4,
         marginBottom: 4,
-        padding: '16px 18px',
-        background: 'rgba(255,107,107,0.04)',
-        border: '1px solid rgba(255,107,107,0.2)',
+        padding: '18px 18px 16px',
+        // Neutral "closed lane" — a faint diagonal hatch over the subtle
+        // surface signals intentional unavailability without alarm colour.
+        background:
+          'repeating-linear-gradient(135deg, transparent 0 7px, rgba(255,255,255,0.018) 7px 8px), var(--surface-subtle)',
+        border: '1px solid var(--border-strong)',
         borderRadius: 'var(--radius)',
       }}
     >
-      <div
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: '#FF6B6B',
-          marginBottom: 6,
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-        }}
-      >
-        {side.toUpperCase()} side unavailable
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        {/* Muted no-entry glyph — grey, not red */}
+        <div
+          aria-hidden
+          style={{
+            flexShrink: 0,
+            width: 28,
+            height: 28,
+            display: 'grid',
+            placeItems: 'center',
+            border: '1px solid var(--border-strong)',
+            color: 'var(--text-dim)',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="7" cy="7" r="5.5" />
+            <line x1="3.1" y1="3.1" x2="10.9" y2="10.9" />
+          </svg>
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              marginBottom: 3,
+            }}
+          >
+            {side.toUpperCase()} unavailable
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', lineHeight: 1.4 }}>
+            {rejectionReasonText(reasonCode)}
+          </div>
+        </div>
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: otherOpen ? 12 : 0 }}>
-        {rejectionReasonText(reasonCode)}
-      </div>
+
       {otherOpen && (
-        <Button variant="ghost" onClick={onSwitch}>
-          Switch to {otherLabel}
-        </Button>
+        <button
+          type="button"
+          onClick={onSwitch}
+          style={{
+            marginTop: 14,
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            padding: '10px 14px',
+            background: otherAccentSoft,
+            border: `1px solid ${otherAccentBorder}`,
+            borderRadius: 'var(--radius)',
+            color: otherAccent,
+            fontFamily: 'var(--font)',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'background 0.15s ease, border-color 0.15s ease',
+          }}
+        >
+          <span>
+            Switch to {otherLabel}
+            {otherSub && (
+              <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>{`  ·  ${otherSub}`}</span>
+            )}
+          </span>
+          <span aria-hidden style={{ fontSize: 15, lineHeight: 1 }}>→</span>
+        </button>
       )}
     </div>
   )

@@ -1,6 +1,6 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { getApiKey } from '../runtimeConfig'
 import { ApiKeyGate } from './ApiKeyGate'
+import { ConnectControls } from './ConnectControls'
 
 /**
  * Pre-connect landing block. Centered logo + welcome blurb + API-key gate +
@@ -59,85 +59,7 @@ export function Hero() {
       >
         {!hasKey && <ApiKeyGate />}
 
-        {hasKey && (
-        <ConnectButton.Custom>
-          {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
-            const ready = mounted
-            const connected = ready && account && chain
-
-            const baseStyle: React.CSSProperties = {
-              padding: '10px 18px',
-              fontSize: 13,
-              fontWeight: 600,
-              borderRadius: 0,
-              cursor: 'pointer',
-              fontFamily: 'var(--font)',
-              lineHeight: 1.2,
-              border: '1px solid var(--border)',
-              background: 'var(--surface-subtle)',
-              color: 'var(--text)',
-              transition: 'border-color 0.15s ease, background 0.15s ease',
-            }
-
-            return (
-              <div
-                style={{
-                  opacity: !ready ? 0 : 1,
-                  pointerEvents: !ready ? 'none' : undefined,
-                  display: 'inline-flex',
-                  gap: 8,
-                }}
-              >
-                {(() => {
-                  if (!connected) {
-                    return (
-                      <button
-                        type="button"
-                        onClick={openConnectModal}
-                        style={{
-                          ...baseStyle,
-                          background: 'var(--yellow)',
-                          color: 'var(--yellow-ink)',
-                          borderColor: 'var(--yellow)',
-                          fontWeight: 700,
-                        }}
-                      >
-                        Connect wallet
-                      </button>
-                    )
-                  }
-                  if (chain.unsupported) {
-                    return (
-                      <button
-                        type="button"
-                        onClick={openChainModal}
-                        style={{
-                          ...baseStyle,
-                          background: 'rgba(224,82,82,0.08)',
-                          color: 'var(--red)',
-                          borderColor: 'rgba(224,82,82,0.3)',
-                        }}
-                      >
-                        Wrong network
-                      </button>
-                    )
-                  }
-                  return (
-                    <>
-                      <button type="button" onClick={openChainModal} style={baseStyle}>
-                        {chain.name}
-                      </button>
-                      <button type="button" onClick={openAccountModal} style={baseStyle}>
-                        {account.displayName}
-                      </button>
-                    </>
-                  )
-                })()}
-              </div>
-            )
-          }}
-        </ConnectButton.Custom>
-        )}
+        {hasKey && <ConnectControls />}
 
         <a
           href="https://docs.dimes.fi"

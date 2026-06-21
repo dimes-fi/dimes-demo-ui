@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
-import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useDisconnect, useAccount, useBalance } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { useDepositWallet } from '../contract/useDepositWallet'
 import { useMintSandboxUsdc } from '../contract/hooks'
-import { useDisplayWallet } from '../hooks/useDisplayWallet'
+import { ConnectControls } from './ConnectControls'
 import { useToastStore } from '../store/toasts'
 import { formatContractError } from '../contract/error-messages'
 import {
@@ -19,104 +18,7 @@ import {
 } from '../runtimeConfig'
 
 function CompactConnectButton() {
-  const displayWallet = useDisplayWallet()
-  const baseBtn: React.CSSProperties = {
-    padding: '6px 12px',
-    fontSize: 12,
-    fontWeight: 600,
-    borderRadius: 0,
-    border: '1px solid var(--border)',
-    background: 'var(--surface-subtle)',
-    color: 'var(--text)',
-    cursor: 'pointer',
-    fontFamily: 'var(--font)',
-    lineHeight: 1.2,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    transition: 'background 0.15s ease, border-color 0.15s ease',
-  }
-
-  return (
-    <ConnectButton.Custom>
-      {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
-        const ready = mounted
-        const connected = ready && account && chain
-        return (
-          <div
-            style={{
-              opacity: !ready ? 0 : 1,
-              pointerEvents: !ready ? 'none' : undefined,
-              userSelect: !ready ? 'none' : undefined,
-              display: 'inline-flex',
-              gap: 8,
-            }}
-          >
-            {(() => {
-              if (!connected) {
-                return (
-                  <button
-                    onClick={openConnectModal}
-                    type="button"
-                    style={{
-                      ...baseBtn,
-                      background: 'var(--yellow)',
-                      color: 'var(--yellow-ink)',
-                      borderColor: 'var(--yellow)',
-                      fontWeight: 700,
-                    }}
-                  >
-                    Connect Wallet
-                  </button>
-                )
-              }
-              if (chain.unsupported) {
-                return (
-                  <button
-                    onClick={openChainModal}
-                    type="button"
-                    style={{
-                      ...baseBtn,
-                      background: 'rgba(224,82,82,0.08)',
-                      color: 'var(--red)',
-                      borderColor: 'rgba(224,82,82,0.3)',
-                    }}
-                  >
-                    Wrong network
-                  </button>
-                )
-              }
-              return (
-                <>
-                  <button
-                    onClick={openChainModal}
-                    type="button"
-                    style={baseBtn}
-                  >
-                    {chain.hasIcon && chain.iconUrl && (
-                      <img
-                        alt={chain.name ?? 'Chain'}
-                        src={chain.iconUrl}
-                        style={{ width: 14, height: 14, borderRadius: '50%' }}
-                      />
-                    )}
-                    {chain.name}
-                  </button>
-                  <button
-                    onClick={openAccountModal}
-                    type="button"
-                    style={baseBtn}
-                  >
-                    {displayWallet ? shortenAddress(displayWallet) : account.displayName}
-                  </button>
-                </>
-              )
-            })()}
-          </div>
-        )
-      }}
-    </ConnectButton.Custom>
-  )
+  return <ConnectControls compact />
 }
 
 const USDC_ADDRESS = getUsdcAddress()
