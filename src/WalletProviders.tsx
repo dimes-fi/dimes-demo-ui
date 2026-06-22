@@ -1,83 +1,26 @@
-import { useEffect, type ReactNode } from 'react'
-import { WagmiProvider, useAccount, useConnect, useDisconnect } from 'wagmi'
+import { lazy, useEffect, Suspense, type ReactNode } from 'react'
+import { WagmiProvider, useAccount, useDisconnect } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
 import { PrivyProvider, usePrivy } from '@privy-io/react-auth'
 import { SmartWalletsProvider, useSmartWallets } from '@privy-io/react-auth/smart-wallets'
 import { WagmiProvider as PrivyWagmiProvider } from '@privy-io/wagmi'
-import { TurnkeyProvider, useTurnkey, AuthState } from '@turnkey/react-wallet-kit'
-import '@turnkey/react-wallet-kit/styles.css'
-import { createAccount } from '@turnkey/viem'
 import { polygon, polygonAmoy } from 'wagmi/chains'
 
 import { config, isTestnet } from './config'
 import { privyWagmiConfig } from './config.privy'
-import { turnkeyWagmiConfig } from './config.turnkey'
-import { setTurnkeyAccount, clearTurnkeyAccount } from './turnkey/connector'
 import { setSmartWalletClient } from './contract/smartWalletClient'
 import { useAuthStore } from './store/auth'
-import {
-  getPrivyAppId,
-  getTurnkeyApiBaseUrl,
-  getTurnkeyAuthProxyConfigId,
-  getTurnkeyOrgId,
-  walletBackend,
-} from './runtimeConfig'
+import { getPrivyAppId, walletBackend } from './runtimeConfig'
 
 const queryClient = new QueryClient()
 
 const chain = isTestnet ? polygonAmoy : polygon
-const rpcUrl = import.meta.env.VITE_RPC_URL as string | undefined
 
-/**
- * Keeps wagmi's connection in lockstep with the Turnkey session. On login it
- * derives a viem account from the user's Ethereum wallet account (via
- * `@turnkey/viem`), hands it to the connector, and connects wagmi. On logout it
- * clears the connector and disconnects. Rendered inside both TurnkeyProvider
- * (for `useTurnkey`) and WagmiProvider (for `useConnect`).
- */
-function TurnkeyBridge({ children }: { children: ReactNode }) {
-  const { authState, httpClient, wallets } = useTurnkey()
-  const { connect, connectors } = useConnect()
-  const { disconnect } = useDisconnect()
-  const { isConnected } = useAccount()
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function sync() {
-      if (authState === AuthState.Authenticated && httpClient && wallets?.length) {
-        // First Ethereum account across the user's wallets; it carries its own
-        // (sub-)organizationId, which is what `createAccount` must sign under.
-        const ethAccount = wallets
-          .flatMap((w) => w.accounts ?? [])
-          .find((a) => a.addressFormat === 'ADDRESS_FORMAT_ETHEREUM')
-        if (!ethAccount) return
-
-        const account = await createAccount({
-          client: httpClient,
-          organizationId: ethAccount.organizationId,
-          signWith: ethAccount.address,
-        })
-        if (cancelled) return
-
-        setTurnkeyAccount(account, chain, rpcUrl)
-        const connector = connectors.find((c) => c.id === 'turnkey')
-        if (connector && !isConnected) connect({ connector })
-      } else if (authState === AuthState.Unauthenticated) {
-        clearTurnkeyAccount()
-        if (isConnected) disconnect()
-      }
-    }
-
-    void sync()
-    return () => {
-      cancelled = true
-    }
-  }, [authState, httpClient, wallets, connect, connectors, disconnect, isConnected])
-
-  return <>{children}</>
-}
+// Turnkey's SDK throws at module-eval in a bundled web build, so its whole
+// stack is lazy-loaded — only evaluated when Turnkey is the selected backend,
+// never on the default Privy/RainbowKit path.
+const TurnkeyStack = lazy(() => import('./turnkey/TurnkeyStack'))
 
 /**
  * Publishes the Privy AA smart-account client + address so the shared
@@ -131,19 +74,9 @@ export function WalletProviders({ children }: { children: ReactNode }) {
 
   if (backend === 'turnkey') {
     return (
-      <TurnkeyProvider
-        config={{
-          organizationId: getTurnkeyOrgId(),
-          authProxyConfigId: getTurnkeyAuthProxyConfigId(),
-          apiBaseUrl: getTurnkeyApiBaseUrl(),
-        }}
-      >
-        <QueryClientProvider client={queryClient}>
-          <WagmiProvider config={turnkeyWagmiConfig}>
-            <TurnkeyBridge>{children}</TurnkeyBridge>
-          </WagmiProvider>
-        </QueryClientProvider>
-      </TurnkeyProvider>
+      <Suspense fallback={null}>
+        <TurnkeyStack>{children}</TurnkeyStack>
+      </Suspense>
     )
   }
 

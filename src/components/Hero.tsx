@@ -1,6 +1,6 @@
 import { getApiKey } from '../runtimeConfig'
 import { ApiKeyGate } from './ApiKeyGate'
-import { ConnectControls } from './ConnectControls'
+import { HomeConnect } from './HomeConnect'
 
 /**
  * Pre-connect landing block. Centered logo + welcome blurb + API-key gate +
@@ -59,7 +59,7 @@ export function Hero() {
       >
         {!hasKey && <ApiKeyGate />}
 
-        {hasKey && <ConnectControls />}
+        {hasKey && <HomeConnect />}
 
         <a
           href="https://docs.dimes.fi"

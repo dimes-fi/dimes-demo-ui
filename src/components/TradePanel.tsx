@@ -873,7 +873,7 @@ export function TradePanel({
                   onClick={handleApprove}
                   disabled={approvePending || approveConfirming}
                 >
-                  {approveConfirming ? 'Confirming…' : approvePending ? 'Approving…' : 'Approve USDC'}
+                  {approveConfirming ? 'Confirming…' : approvePending ? 'Approving…' : 'Approve pUSD'}
                 </Button>
               )}
               <Button

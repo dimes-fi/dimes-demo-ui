@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/auth';
 import { requestAuthToken } from '../api/auth';
 import { ApiError } from '../api/client';
@@ -19,7 +20,9 @@ export function useAutoAuth() {
   const depositWalletAddress = useAuthStore((s) => s.depositWalletAddress);
   const smartWalletAddress = useAuthStore((s) => s.smartWalletAddress);
   const displayWallet = useDisplayWallet();
+  const queryClient = useQueryClient();
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastEffectiveAddress = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     // For a smart wallet (AA) or a deposit wallet, the JWT and quotes must be
@@ -35,6 +38,13 @@ export function useAutoAuth() {
         : depositWalletMode && depositWalletAddress
           ? depositWalletAddress
           : connectedAddress;
+
+    // When the active wallet changes (switch wallets, logout), drop wallet-scoped
+    // caches so we never show the previous wallet's positions/data.
+    if (effectiveAddress !== lastEffectiveAddress.current) {
+      lastEffectiveAddress.current = effectiveAddress;
+      queryClient.removeQueries({ queryKey: ['positions'] });
+    }
 
     function clearTimer() {
       if (refreshTimer.current) {
@@ -87,5 +97,6 @@ export function useAutoAuth() {
     displayWallet,
     setAuth,
     clearAuth,
+    queryClient,
   ]);
 }

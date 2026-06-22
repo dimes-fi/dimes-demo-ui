@@ -40,6 +40,8 @@ const KEY_KEY = 'dimes.apiKey'
 const PRIVY_KEY = 'dimes.privyAppId'
 const TK_ORG_KEY = 'dimes.turnkeyOrgId'
 const TK_PROXY_KEY = 'dimes.turnkeyAuthProxyConfigId'
+const BACKEND_KEY = 'dimes.walletBackend'
+const AUTOCONNECT_KEY = 'dimes.autoConnect'
 
 function ss(): Storage | null {
   try {
@@ -145,18 +147,54 @@ export function getTurnkeyApiBaseUrl(): string {
 
 export type WalletBackend = 'rainbowkit' | 'privy' | 'turnkey'
 
+/** True when a backend has the config it needs to mount. */
+export function isBackendConfigured(b: WalletBackend): boolean {
+  if (b === 'privy') return getPrivyAppId().length > 0
+  if (b === 'turnkey') return !!(getTurnkeyOrgId() && getTurnkeyAuthProxyConfigId())
+  return true // rainbowkit needs no extra config
+}
+
 /**
- * Which wallet stack mounts. Turnkey wins when fully configured, then Privy,
- * else the default RainbowKit stack. Fixed for the page's lifetime — a settings
- * change forces a reload — so the choice never flips between renders.
+ * Which wallet stack mounts. Privy and Turnkey each need their own provider
+ * stack, so they can't co-mount — instead the home page is a selector that
+ * persists a choice here and reloads into that stack (same reload pattern as
+ * applySettings). Precedence: explicit user selection > Privy > Turnkey >
+ * RainbowKit. Fixed for the page's lifetime, so the choice never flips between
+ * renders.
  */
 export function walletBackend(): WalletBackend {
-  if (getTurnkeyOrgId() && getTurnkeyAuthProxyConfigId()) return 'turnkey'
+  const selected = ss()?.getItem(BACKEND_KEY) as WalletBackend | null
+  if (selected && isBackendConfigured(selected)) return selected
   if (getPrivyAppId()) return 'privy'
+  if (getTurnkeyOrgId() && getTurnkeyAuthProxyConfigId()) return 'turnkey'
   return 'rainbowkit'
 }
 
-/** True when a Privy app id is configured (and Turnkey isn't taking priority). */
+/**
+ * Switch the mounted wallet stack and reload. Sets an auto-connect flag so the
+ * newly mounted stack opens its connect flow immediately (see
+ * consumeAutoConnect). Same-stack selection skips the reload — the caller just
+ * triggers that stack's native connect.
+ */
+export function selectBackend(b: WalletBackend): void {
+  const s = ss()
+  if (!s) return
+  s.setItem(BACKEND_KEY, b)
+  s.setItem(AUTOCONNECT_KEY, '1')
+  window.location.reload()
+}
+
+/** Read-and-clear the auto-connect flag set by selectBackend. */
+export function consumeAutoConnect(): boolean {
+  const s = ss()
+  if (s?.getItem(AUTOCONNECT_KEY) === '1') {
+    s.removeItem(AUTOCONNECT_KEY)
+    return true
+  }
+  return false
+}
+
+/** True when a Privy app id is configured and is the active backend. */
 export function isPrivyMode(): boolean {
   return walletBackend() === 'privy'
 }

@@ -68,7 +68,7 @@ const MINT_AMOUNT = 10_000n
 
 /**
  * Sandbox faucet button. The mock collateral token has an open mint, so this
- * lets any connected wallet top itself up with test USDC. Rendered only in the
+ * lets any connected wallet top itself up with test pUSD. Rendered only in the
  * sandbox environment (see Header). On success the balance query is invalidated
  * so the header balance refreshes.
  */
@@ -100,7 +100,7 @@ function MintUsdcButton() {
     if (!isSuccess) return
     queryClient.invalidateQueries()
     addToast({
-      title: `Minted ${MINT_AMOUNT.toLocaleString()} sUSDC`,
+      title: `Minted ${MINT_AMOUNT.toLocaleString()} test pUSD`,
       variant: 'success',
       durationMs: 4000,
     })
@@ -124,7 +124,7 @@ function MintUsdcButton() {
       type="button"
       onClick={() => mint(MINT_AMOUNT)}
       disabled={busy}
-      title="Mint test USDC to your wallet (sandbox only)"
+      title="Mint test pUSD to your wallet (sandbox only)"
       style={{
         padding: '8px 12px',
         fontSize: 'var(--fs-sm)',
@@ -139,7 +139,7 @@ function MintUsdcButton() {
         opacity: busy ? 0.6 : 1,
       }}
     >
-      {isConfirming ? 'Minting…' : isPending ? 'Confirm in wallet…' : 'Get test USDC'}
+      {isConfirming ? 'Minting…' : isPending ? 'Confirm in wallet…' : 'Get test pUSD'}
     </button>
   )
 }
@@ -228,34 +228,31 @@ function WalletKindBadge() {
     )
   }
 
-  // Deposit-wallet owner → push-funded toggle (yellow when active).
+  // Deposit-wallet owner → read-only status (selecting the flow is a home-page
+  // action now; this is just the active-state indicator). Deposit mode
+  // auto-enables on detection.
   if (kind === 'deposit-owner' && depositWalletAddress) {
-    const toggle = () =>
-      depositWalletMode
-        ? setDepositWalletMode(false, null)
-        : setDepositWalletMode(true, depositWalletAddress)
+    const active = depositWalletMode
     return (
-      <button
-        type="button"
-        onClick={toggle}
+      <span
         title={
-          depositWalletMode
-            ? `Push-funded flow active — quotes and positions scoped to deposit wallet ${depositWalletAddress}. Click to trade as the owner EOA instead.`
-            : `A Polymarket deposit wallet (${depositWalletAddress}) is available. Click to route through the push-funded flow.`
+          active
+            ? `Push-funded flow active — quotes and positions scoped to deposit wallet ${depositWalletAddress}.`
+            : `A Polymarket deposit wallet (${depositWalletAddress}) is available for this owner.`
         }
         style={{
           ...baseBadge,
-          border: `1px solid ${depositWalletMode ? 'var(--yellow)' : 'var(--border)'}`,
-          background: depositWalletMode ? 'var(--yellow)' : 'var(--surface-subtle)',
-          color: depositWalletMode ? 'var(--yellow-ink)' : 'var(--text)',
-          cursor: 'pointer',
+          border: `1px solid ${active ? 'var(--yellow)' : 'var(--border)'}`,
+          background: active ? 'var(--yellow)' : 'var(--surface-subtle)',
+          color: active ? 'var(--yellow-ink)' : 'var(--text)',
+          cursor: 'help',
         }}
       >
-        <span style={dot(depositWalletMode ? 'var(--yellow-ink)' : 'var(--text-dim)')} />
-        {depositWalletMode
+        <span style={dot(active ? 'var(--yellow-ink)' : 'var(--text-dim)')} />
+        {active
           ? `Deposit Wallet · ${shortenAddress(depositWalletAddress)}`
-          : 'EOA · deposit wallet available'}
-      </button>
+          : 'Owner EOA · deposit wallet available'}
+      </span>
     )
   }
 

@@ -18,12 +18,24 @@ const RECONCILIATION_WINDOW_MS = 12_000;
 
 export function usePositions(params?: UsePositionsParams) {
   const jwt = useAuthStore((s) => s.jwt);
+  // Scope the cache to the active wallet — otherwise switching wallets (e.g.
+  // Privy → MetaMask) keeps the same query key and serves the previous wallet's
+  // cached positions until a refetch.
+  const walletAddress = useAuthStore((s) => s.walletAddress);
   const expandKey = params?.expand?.join(',') ?? '';
 
   return useQuery({
-    queryKey: ['positions', params?.sortBy, params?.sortDirection, params?.state, params?.status, expandKey],
+    queryKey: [
+      'positions',
+      walletAddress?.toLowerCase() ?? null,
+      params?.sortBy,
+      params?.sortDirection,
+      params?.state,
+      params?.status,
+      expandKey,
+    ],
     queryFn: () => fetchPositions(params),
-    enabled: !!jwt,
+    enabled: !!jwt && !!walletAddress,
     refetchInterval: (query) => {
       const data = query.state.data as Position[] | undefined;
       if (data?.some((p) => p.status === 'pending' || p.status === 'closing' || p.status === 'settling' || p.status === 'unwinding')) return FAST_POLL_MS;

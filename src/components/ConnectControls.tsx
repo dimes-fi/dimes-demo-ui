@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { usePrivy, useFundWallet, useExportWallet } from '@privy-io/react-auth'
-import { useTurnkey, AuthState } from '@turnkey/react-wallet-kit'
 import { useAccount, useBalance, useChainId, useSwitchChain } from 'wagmi'
 import { formatUnits } from 'viem'
 import { getUsdcAddress, walletBackend } from '../runtimeConfig'
 import { useDisplayWallet } from '../hooks/useDisplayWallet'
 import { useAuthStore } from '../store/auth'
+import { btnStyle, shorten, type MenuAction } from './connectShared'
 
 // ---------------------------------------------------------------------------
 // CONNECT CONTROLS
@@ -22,39 +22,18 @@ import { useAuthStore } from '../store/auth'
 // backend connected the wallet.
 // ---------------------------------------------------------------------------
 
-interface MenuAction {
-  label: string
-  onClick: () => void
-  danger?: boolean
-}
-
-function shorten(address: string): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`
-}
-
-function btnStyle(compact: boolean): React.CSSProperties {
-  return {
-    padding: compact ? '6px 12px' : '10px 18px',
-    fontSize: compact ? 12 : 13,
-    fontWeight: 600,
-    borderRadius: 0,
-    border: '1px solid var(--border)',
-    background: 'var(--surface-subtle)',
-    color: 'var(--text)',
-    cursor: 'pointer',
-    fontFamily: 'var(--font)',
-    lineHeight: 1.2,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    transition: 'background 0.15s ease, border-color 0.15s ease',
-  }
-}
+// Lazy so @turnkey/react-wallet-kit (which throws at module-eval in a bundled
+// web build) is only evaluated when Turnkey is the active backend.
+const TurnkeyControls = lazy(() => import('../turnkey/TurnkeyControls'))
 
 export function ConnectControls({ compact = false }: { compact?: boolean }) {
   switch (walletBackend()) {
     case 'turnkey':
-      return <TurnkeyControls compact={compact} />
+      return (
+        <Suspense fallback={null}>
+          <TurnkeyControls compact={compact} />
+        </Suspense>
+      )
     case 'privy':
       return <PrivyControls compact={compact} />
     default:
@@ -225,7 +204,7 @@ const USDC_ADDRESS = getUsdcAddress()
  * Shared by Privy and Turnkey so both keep the app's squared look without
  * depending on either SDK's own account UI.
  */
-function AccountMenuShell({
+export function AccountMenuShell({
   address,
   label,
   base,
@@ -373,59 +352,3 @@ function PrivyAccountMenu({
 
 // react-wallet-kit's published context type omits `logout` (the runtime exposes
 // it), so reach it through a narrow cast.
-interface TurnkeyLogout {
-  logout?: () => Promise<void>
-}
-
-function TurnkeyControls({ compact }: { compact: boolean }) {
-  const tk = useTurnkey()
-  const { authState, handleLogin, wallets } = tk
-  const { address } = useAccount()
-  const displayWallet = useDisplayWallet()
-  const base = btnStyle(compact)
-
-  const connected = authState === AuthState.Authenticated && !!address
-
-  if (!connected) {
-    return (
-      <div style={{ display: 'inline-flex', gap: 8 }}>
-        <button
-          type="button"
-          onClick={() => void handleLogin()}
-          style={{
-            ...base,
-            background: 'var(--yellow)',
-            color: 'var(--yellow-ink)',
-            borderColor: 'var(--yellow)',
-            fontWeight: 700,
-          }}
-        >
-          Connect wallet
-        </button>
-      </div>
-    )
-  }
-
-  const walletId = wallets?.[0]?.walletId
-  const logout = (tk as unknown as TurnkeyLogout).logout
-  const actions: MenuAction[] = [
-    ...(walletId
-      ? [{ label: 'Export wallet key', onClick: () => void tk.handleExportWallet({ walletId }) }]
-      : []),
-    { label: 'Disconnect', onClick: () => void logout?.(), danger: true },
-  ]
-
-  return (
-    <div style={{ display: 'inline-flex', gap: 8 }}>
-      <button type="button" style={{ ...base, cursor: 'default' }} disabled>
-        Polygon
-      </button>
-      <AccountMenuShell
-        address={address!}
-        label={shorten(displayWallet ?? address!)}
-        base={base}
-        actions={actions}
-      />
-    </div>
-  )
-}
