@@ -1,4 +1,4 @@
-import { lazy, useEffect, Suspense, type ReactNode } from 'react'
+import { lazy, useEffect, useRef, Suspense, type ReactNode } from 'react'
 import { WagmiProvider, useAccount, useDisconnect } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
@@ -11,7 +11,7 @@ import { config, isTestnet } from './config'
 import { privyWagmiConfig } from './config.privy'
 import { setSmartWalletClient } from './contract/smartWalletClient'
 import { useAuthStore } from './store/auth'
-import { getPrivyAppId, walletBackend } from './runtimeConfig'
+import { getApiKey, getPrivyAppId, walletBackend } from './runtimeConfig'
 
 const queryClient = new QueryClient()
 
@@ -35,22 +35,33 @@ function SmartWalletBridge() {
   const { disconnect } = useDisconnect()
   const setSmartWalletAddress = useAuthStore((s) => s.setSmartWalletAddress)
   const clearAuth = useAuthStore((s) => s.clearAuth)
+  const wasAuthenticated = useRef(false)
 
   useEffect(() => {
     if (authenticated) {
+      wasAuthenticated.current = true
       setSmartWalletClient(client ?? null)
       setSmartWalletAddress(client?.account?.address ?? null)
       return
     }
-    // Single teardown authority. Disconnect = Privy `logout()` only; it flips
+    setSmartWalletClient(null)
+    setSmartWalletAddress(null)
+    // Single teardown authority, but ONLY for an actual Privy logout
+    // (authenticated true→false). Disconnect = Privy `logout()` only; it flips
     // `authenticated`, and this effect (running *after* logout settles, so it
     // can't interfere with it) drops the wagmi session + scoped auth. Doing the
     // wagmi disconnect inside the logout click instead left Privy half-logged-in
     // ("user is already logged in" on the next connect).
-    setSmartWalletClient(null)
-    setSmartWalletAddress(null)
-    clearAuth()
-    if (isConnected) disconnect()
+    //
+    // A wallet connected via `connectWallet()` (the "Connect a wallet" button)
+    // is NOT a Privy login — `authenticated` stays false — so it was never
+    // authenticated. Don't tear that down, or the external wallet disconnects
+    // and the JWT clears the instant wagmi connects.
+    if (wasAuthenticated.current) {
+      wasAuthenticated.current = false
+      clearAuth()
+      if (isConnected) disconnect()
+    }
   }, [authenticated, client, isConnected, disconnect, setSmartWalletAddress, clearAuth])
 
   return null
@@ -71,6 +82,12 @@ function SmartWalletBridge() {
  */
 export function WalletProviders({ children }: { children: ReactNode }) {
   const backend = walletBackend()
+  // The API key (sessionStorage) is gone on tab close but the wallet connection
+  // persists (localStorage). Without this gate a returning user auto-reconnects
+  // a wallet with no key to mint a JWT against — connected but stuck. Hold off
+  // reconnect until a key is present; entering one reloads the page (see
+  // applySettings) and reconnect proceeds normally.
+  const hasApiKey = Boolean(getApiKey())
 
   if (backend === 'turnkey') {
     return (
@@ -92,7 +109,7 @@ export function WalletProviders({ children }: { children: ReactNode }) {
         }}
       >
         <QueryClientProvider client={queryClient}>
-          <PrivyWagmiProvider config={privyWagmiConfig}>
+          <PrivyWagmiProvider config={privyWagmiConfig} reconnectOnMount={hasApiKey}>
             <SmartWalletsProvider>
               <SmartWalletBridge />
               {children}
@@ -104,7 +121,7 @@ export function WalletProviders({ children }: { children: ReactNode }) {
   }
 
   return (
-    <WagmiProvider config={config}>
+    <WagmiProvider config={config} reconnectOnMount={hasApiKey}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
           theme={darkTheme({ accentColor: '#EEFF00', accentColorForeground: '#0C0C0C' })}

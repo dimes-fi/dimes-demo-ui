@@ -75,24 +75,31 @@ function App() {
     <Layout>
       <ToastContainer />
       <DebugPanel />
-      {isConnected && <Header />}
+      {hasApiKey && isConnected && <Header />}
 
       <main style={{ padding: '24px 0' }}>
-        {!isConnected && <Hero />}
-
-        {isConnected && !jwt && (
+        {/* Gate on the API key first: a returning user can have a persisted
+            wallet but no key (sessionStorage is cleared on tab close), so the
+            key must come before connect — otherwise reconnect mints against no
+            key. Wallet auto-reconnect is held off until a key exists (see
+            WalletProviders). */}
+        {!hasApiKey && (
           <div style={{ padding: '48px 0', display: 'flex', justifyContent: 'center' }}>
-            {hasApiKey ? (
-              <span style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-sm)' }}>
-                Loading…
-              </span>
-            ) : (
-              <ApiKeyGate title="An API key is required to continue" />
-            )}
+            <ApiKeyGate title="An API key is required to continue" />
           </div>
         )}
 
-        {isConnected && jwt && (
+        {hasApiKey && !isConnected && <Hero />}
+
+        {hasApiKey && isConnected && !jwt && (
+          <div style={{ padding: '48px 0', display: 'flex', justifyContent: 'center' }}>
+            <span style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-sm)' }}>
+              Loading…
+            </span>
+          </div>
+        )}
+
+        {hasApiKey && isConnected && jwt && (
           <>
             <div>
               <MarketsTitle count={marketCount} />
