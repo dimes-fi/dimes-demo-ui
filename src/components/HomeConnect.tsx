@@ -9,6 +9,7 @@ import {
   type WalletBackend,
 } from '../runtimeConfig'
 import { primaryBtn, secondaryBtn } from './connectShared'
+import { useAuthStore } from '../store/auth'
 
 // ---------------------------------------------------------------------------
 // HOME CONNECT
@@ -70,16 +71,17 @@ export function SwitchButton({ to, label }: { to: WalletBackend; label: string }
   )
 }
 
-/** Connect through a Polymarket deposit wallet. Connecting the owner wallet is
- *  enough — `useWalletKind` detects the deposit wallet and auto-routes the
- *  push-funded flow. */
+/** Connect through a Polymarket deposit wallet. Records the deposit-wallet
+ *  intent, then connects the owner wallet — the app scopes auth + quotes to the
+ *  deposit wallet (push-funded flow). The header shows a red status if no
+ *  deposit wallet is available for the connection. */
 function DepositWalletButton({ onConnectOwner }: { onConnectOwner: () => void }) {
   return (
     <button
       type="button"
       style={secondaryBtn}
       onClick={onConnectOwner}
-      title="Connect the wallet that owns a Polymarket deposit wallet — the app detects it and routes the push-funded flow."
+      title="Connect the wallet that owns a Polymarket deposit wallet — trades route through the push-funded flow scoped to that deposit wallet."
     >
       Polymarket deposit wallet
     </button>
@@ -107,6 +109,7 @@ export function HomeConnect() {
 
 function PrivyHome() {
   const { login, connectWallet } = usePrivy()
+  const setWantsDepositWallet = useAuthStore((s) => s.setWantsDepositWallet)
 
   useEffect(() => {
     if (consumeAutoConnect()) login()
@@ -114,19 +117,39 @@ function PrivyHome() {
 
   return (
     <Stack>
-      <button type="button" style={primaryBtn} onClick={() => connectWallet()}>
+      <button
+        type="button"
+        style={primaryBtn}
+        onClick={() => {
+          setWantsDepositWallet(false)
+          connectWallet()
+        }}
+      >
         Connect a wallet
       </button>
-      <button type="button" style={secondaryBtn} onClick={() => login()}>
+      <button
+        type="button"
+        style={secondaryBtn}
+        onClick={() => {
+          setWantsDepositWallet(false)
+          login()
+        }}
+      >
         Connect with Privy
       </button>
-      <DepositWalletButton onConnectOwner={() => connectWallet()} />
+      <DepositWalletButton
+        onConnectOwner={() => {
+          setWantsDepositWallet(true)
+          connectWallet()
+        }}
+      />
       <TurnkeyComingSoon />
     </Stack>
   )
 }
 
 function RainbowHome() {
+  const setWantsDepositWallet = useAuthStore((s) => s.setWantsDepositWallet)
   return (
     <ConnectButton.Custom>
       {({ openConnectModal, mounted }) => (
@@ -134,12 +157,20 @@ function RainbowHome() {
           <button
             type="button"
             style={{ ...primaryBtn, opacity: mounted ? 1 : 0 }}
-            onClick={openConnectModal}
+            onClick={() => {
+              setWantsDepositWallet(false)
+              openConnectModal()
+            }}
           >
             Connect a wallet
           </button>
           <SwitchButton to="privy" label="Connect with Privy" />
-          <DepositWalletButton onConnectOwner={openConnectModal} />
+          <DepositWalletButton
+            onConnectOwner={() => {
+              setWantsDepositWallet(true)
+              openConnectModal()
+            }}
+          />
           <TurnkeyComingSoon />
         </Stack>
       )}

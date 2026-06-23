@@ -80,6 +80,13 @@ export function useWalletKind(): WalletKindInfo {
           setContractKind('eoa')
           return
         }
+        // An EIP-7702 delegation designator (0xef0100 ++ 20-byte target) is code
+        // on an otherwise-plain EOA — modern MetaMask "smart accounts" set this.
+        // It's still an EOA for our purposes; don't mislabel it smart-contract.
+        if (code.toLowerCase().startsWith('0xef0100')) {
+          setContractKind('eoa')
+          return
+        }
         // Has bytecode → a contract account. A Safe answers getOwners(); others
         // revert. Either way it's the direct flow, but the label differs.
         try {

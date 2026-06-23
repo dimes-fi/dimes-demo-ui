@@ -119,7 +119,7 @@ function RainbowControls({ compact }: { compact: boolean }) {
 }
 
 function PrivyControls({ compact }: { compact: boolean }) {
-  const { ready, authenticated, login } = usePrivy()
+  const { ready, login } = usePrivy()
   const { address, chain } = useAccount()
   const chainId = useChainId()
   const { chains, switchChain } = useSwitchChain()
@@ -131,7 +131,11 @@ function PrivyControls({ compact }: { compact: boolean }) {
   // back to the smart-account address for the connected state + pill.
   const activeAddress = (address ?? smartWalletAddress ?? undefined) as `0x${string}` | undefined
   const expectedChainId = chains[0]?.id
-  const connected = ready && authenticated && !!activeAddress
+  // An external wallet connected via `connectWallet()` (e.g. MetaMask) is wired
+  // into wagmi without a Privy login, so `authenticated` stays false. Key the
+  // connected state off the actual address — `login` is still the action when
+  // nothing is connected.
+  const connected = ready && !!activeAddress
   // Chain check only applies when wagmi actually has the account wired up.
   const wrongNetwork = connected && !!address && expectedChainId != null && chainId !== expectedChainId
 

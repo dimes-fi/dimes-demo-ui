@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { useAutoAuth } from './hooks/useAutoAuth'
+import { useResolveDepositWallet } from './hooks/useResolveDepositWallet'
 import { usePositionSocket } from './hooks/usePositionSocket'
 import { useMarketSocket } from './hooks/useMarketSocket'
 import { useSeedLiveMarkets } from './hooks/useSeedLiveMarkets'
@@ -45,6 +46,7 @@ function MarketsTitle({ count }: { count?: number }) {
 
 function App() {
   const { isConnected: wagmiConnected } = useAccount()
+  useResolveDepositWallet()
   useAutoAuth()
   usePositionSocket()
   useMarketSocket()

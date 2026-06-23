@@ -4,6 +4,12 @@ interface AuthState {
   jwt: string | null;
   walletAddress: string | null;
   expiresAt: string | null;
+  /**
+   * User intent picked on the home page (or toggled from the header badge):
+   * `true` = trade as the Polymarket deposit wallet, `false` = trade as the
+   * connected EOA. Drives `depositWalletMode`; auto-detection no longer flips it.
+   */
+  wantsDepositWallet: boolean;
   /** When true, auth + quotes are scoped to `depositWalletAddress` instead of the connected wallet. */
   depositWalletMode: boolean;
   /** The Polymarket deposit wallet contract address, when deposit-wallet mode is on. */
@@ -17,6 +23,7 @@ interface AuthState {
   smartWalletAddress: string | null;
   setAuth: (jwt: string, walletAddress: string, expiresAt: string) => void;
   clearAuth: () => void;
+  setWantsDepositWallet: (wantsDepositWallet: boolean) => void;
   setDepositWalletMode: (enabled: boolean, depositWalletAddress: string | null) => void;
   setSmartWalletAddress: (address: string | null) => void;
 }
@@ -25,6 +32,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   jwt: null,
   walletAddress: null,
   expiresAt: null,
+  wantsDepositWallet: false,
   depositWalletMode: false,
   depositWalletAddress: null,
   smartWalletAddress: null,
@@ -34,10 +42,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       jwt: null,
       walletAddress: null,
       expiresAt: null,
+      wantsDepositWallet: false,
       depositWalletMode: false,
       depositWalletAddress: null,
       smartWalletAddress: null,
     }),
+  setWantsDepositWallet: (wantsDepositWallet) => set({ wantsDepositWallet }),
   setDepositWalletMode: (depositWalletMode, depositWalletAddress) => set({ depositWalletMode, depositWalletAddress }),
   setSmartWalletAddress: (smartWalletAddress) => set({ smartWalletAddress }),
 }));
