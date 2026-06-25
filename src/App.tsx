@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { useAutoAuth } from './hooks/useAutoAuth'
+import { useErrorContext } from './hooks/useErrorContext'
 import { useResolveDepositWallet } from './hooks/useResolveDepositWallet'
 import { usePositionSocket } from './hooks/usePositionSocket'
 import { useMarketSocket } from './hooks/useMarketSocket'
@@ -14,7 +15,8 @@ import { installGlobalErrorCapture } from './utils/errorLog'
 
 installGlobalErrorCapture()
 import { Header } from './components/Header'
-import { Hero } from './components/Hero'
+import { PreConnect } from './components/PreConnect'
+import { LoadingScreen } from './components/LoadingScreen'
 import { ApiKeyGate } from './components/ApiKeyGate'
 import { getApiKey } from './runtimeConfig'
 import { MarketList } from './components/MarketList'
@@ -46,6 +48,7 @@ function MarketsTitle({ count }: { count?: number }) {
 
 function App() {
   const { isConnected: wagmiConnected } = useAccount()
+  useErrorContext()
   useResolveDepositWallet()
   useAutoAuth()
   usePositionSocket()
@@ -91,15 +94,9 @@ function App() {
           </div>
         )}
 
-        {hasApiKey && !isConnected && <Hero />}
+        {hasApiKey && !isConnected && <PreConnect />}
 
-        {hasApiKey && isConnected && !jwt && (
-          <div style={{ padding: '48px 0', display: 'flex', justifyContent: 'center' }}>
-            <span style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-sm)' }}>
-              Loading…
-            </span>
-          </div>
-        )}
+        {hasApiKey && isConnected && !jwt && <LoadingScreen message="Authenticating…" />}
 
         {hasApiKey && isConnected && jwt && (
           <>

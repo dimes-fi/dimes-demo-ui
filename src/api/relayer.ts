@@ -1,5 +1,5 @@
-import { apiFetchPublic } from './client';
-import { getApiKey } from '../runtimeConfig';
+import { apiFetchPublic } from './publicFetch';
+import { getApiBase, getApiKey } from '../runtimeConfig';
 
 // Optional override for the relayer endpoint's base URL. Leave unset to use
 // VITE_API_URL like every other call; set this only when the relayer is
@@ -69,7 +69,7 @@ export async function submitRelayerBatch(params: SubmitRelayerBatchParams): Prom
         signature: params.signature,
       }),
     },
-    RELAYER_BASE_URL,
+    RELAYER_BASE_URL ?? getApiBase(),
   );
 }
 

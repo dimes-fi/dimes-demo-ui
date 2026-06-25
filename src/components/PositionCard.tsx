@@ -357,6 +357,24 @@ export function PositionCard({
             >
               {isVoided ? 'voided' : position.status === 'pending' ? 'created' : position.status}
             </span>
+            {position.pendingOperation?.type === 'partial_close' && (
+              <span
+                title="A slice of this position is being sold on-chain"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: '#F5A623',
+                  background: 'rgba(245,166,35,0.08)',
+                  border: '1px solid rgba(245,166,35,0.2)',
+                  borderRadius: 0,
+                  padding: '2px 8px',
+                  textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                reducing
+              </span>
+            )}
             {isPartialOpen && (() => {
               const low = fillRatioPct < 75
               return (
@@ -452,15 +470,17 @@ export function PositionIdRow({
   positionId,
   copied,
   onCopy,
+  entityLabel = 'Position ID',
 }: {
   positionId: string
   copied: boolean
   onCopy: (e: React.MouseEvent) => void
+  entityLabel?: string
 }) {
   return (
     <div
       onClick={onCopy}
-      title={copied ? 'Position ID copied' : `Click to copy: ${positionId}`}
+      title={copied ? `${entityLabel} copied` : `Click to copy: ${positionId}`}
       style={{
         marginTop: 4,
         display: 'inline-flex',

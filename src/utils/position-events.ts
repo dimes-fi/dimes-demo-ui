@@ -16,6 +16,10 @@ const eventToastMap: Record<PositionEventType, ToastConfig> = {
   'position.settled': { title: 'Position settled', variant: 'success', durationMs: 5000 },
   'position.liquidated': { title: 'Position liquidated', variant: 'warning', durationMs: 8000 },
   'position.force_unwound': { title: 'Leverage reduced', variant: 'warning', durationMs: 8000 },
+  'position.partial_close_requested': { title: 'Reduce requested', variant: 'info', durationMs: 5000 },
+  'position.partial_close_initiated': { title: 'Reducing position', variant: 'info', durationMs: 5000 },
+  'position.partial_closed': { title: 'Position reduced', variant: 'success', durationMs: 5000 },
+  'position.partial_close_aborted': { title: 'Reduction cancelled', variant: 'info', durationMs: 5000 },
   'position.reverted': { title: 'Position failed', variant: 'error', durationMs: 8000 },
   'position.cancelled': { title: 'Position cancelled', variant: 'info', durationMs: 5000 },
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import {
   clearErrorLog,
-  formatErrorLog,
+  formatErrorEntry,
   getErrorLog,
   subscribeErrorLog,
   type ErrorLogEntry,
@@ -18,7 +18,7 @@ const levelColor: Record<ErrorLogEntry['level'], string> = {
 
 export function DebugPanel() {
   const [open, setOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copiedTs, setCopiedTs] = useState<number | null>(null)
   const entries = useErrorLog()
 
   // Discreet keyboard shortcut: Ctrl/Cmd + Shift + D
@@ -33,10 +33,10 @@ export function DebugPanel() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const copy = () => {
-    void navigator.clipboard?.writeText(formatErrorLog())
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+  const copyEntry = (e: ErrorLogEntry) => {
+    void navigator.clipboard?.writeText(formatErrorEntry(e))
+    setCopiedTs(e.ts)
+    setTimeout(() => setCopiedTs(null), 1500)
   }
 
   return (
@@ -102,9 +102,6 @@ export function DebugPanel() {
               </span>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              <button type="button" onClick={copy} style={btnStyle}>
-                {copied ? 'Copied' : 'Copy for AI'}
-              </button>
               <button
                 type="button"
                 onClick={clearErrorLog}
@@ -130,7 +127,7 @@ export function DebugPanel() {
                 }}
               >
                 No errors recorded. If you hit a wallet or chain error, it will show
-                up here — then hit “Copy for AI” and paste it to your assistant.
+                up here — then hit “Copy” on the row and paste it to your assistant.
               </div>
             ) : (
               [...entries].reverse().map((e, i) => (
@@ -155,8 +152,25 @@ export function DebugPanel() {
                     }}
                   >
                     <span style={{ overflowWrap: 'anywhere' }}>{e.title}</span>
-                    <span style={{ color: 'var(--text-dim)', flexShrink: 0, fontWeight: 400 }}>
-                      {new Date(e.ts).toLocaleTimeString()}
+                    <span
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        flexShrink: 0,
+                        fontWeight: 400,
+                      }}
+                    >
+                      <span style={{ color: 'var(--text-dim)' }}>
+                        {new Date(e.ts).toLocaleTimeString()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => copyEntry(e)}
+                        style={{ ...btnStyle, padding: '2px 6px', fontSize: 10 }}
+                      >
+                        {copiedTs === e.ts ? 'Copied' : 'Copy'}
+                      </button>
                     </span>
                   </div>
                   {e.detail && (
@@ -172,6 +186,43 @@ export function DebugPanel() {
                     >
                       {e.detail}
                     </div>
+                  )}
+                  {e.context && Object.keys(e.context).length > 0 && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: 'var(--text-dim)',
+                        marginTop: 6,
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '2px 10px',
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      {Object.entries(e.context).map(([k, v]) => (
+                        <span key={k}>
+                          {k}=
+                          {typeof v === 'string' ? v : JSON.stringify(v)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {e.stack && (
+                    <pre
+                      style={{
+                        fontSize: 10,
+                        color: 'var(--text-dim)',
+                        marginTop: 6,
+                        marginBottom: 0,
+                        maxHeight: 140,
+                        overflowY: 'auto',
+                        whiteSpace: 'pre-wrap',
+                        overflowWrap: 'anywhere',
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      {e.stack}
+                    </pre>
                   )}
                 </div>
               ))

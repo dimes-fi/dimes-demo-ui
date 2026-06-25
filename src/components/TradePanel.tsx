@@ -39,6 +39,7 @@ import { QuoteErrorHint } from './QuoteErrorHint'
 import { Button } from './ui/Button'
 import { Field } from './ui/Field'
 import { Input } from './ui/Input'
+import { PositionIdRow } from './PositionCard'
 
 function formatCreateError(error: unknown): string {
   if (error != null && typeof error === 'object' && 'status' in error && 'code' in error) {
@@ -88,6 +89,7 @@ export function TradePanel({
     clampLeverageToMarket(DEFAULT_LEVERAGE_BPS, market, side),
   )
   const [showTicker, setShowTicker] = useState(false)
+  const [marketIdCopied, setMarketIdCopied] = useState(false)
 
   const sideMaxBps = leverageMaxBps(market.leverage, side)
   const capacityViableLev = useMemo(() => maxViableLeverageBps(market, side), [market, side])
@@ -201,7 +203,7 @@ export function TradePanel({
 
   useEffect(() => {
     if (createSuccess) {
-      queryClient.invalidateQueries({ queryKey: ['positions'] })
+      queryClient.invalidateQueries({ queryKey: ['dimes', 'positions'] })
       onClose()
     }
   }, [createSuccess, queryClient, onClose])
@@ -228,6 +230,14 @@ export function TradePanel({
           description: formatCreateError(err),
           variant: 'error',
           durationMs: 6000,
+          error: err,
+          context: {
+            action: 'createPosition',
+            market: market.ticker,
+            side,
+            leverageBps,
+            collateralUsd,
+          },
         })
       }
       clearOffer()
@@ -488,26 +498,37 @@ export function TradePanel({
             gap: 12,
           }}
         >
-          <div
-            onClick={() => setShowTicker((s) => !s)}
-            title={showTicker ? 'Click for title' : 'Click for ticker'}
-            style={{
-              minWidth: 0,
-              flex: '1 1 auto',
-              cursor: 'pointer',
-              fontSize: 14,
-              fontWeight: 600,
-              color: '#ffffff',
-              lineHeight: 1.3,
-              overflow: 'hidden',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              textOverflow: 'ellipsis',
-              fontFamily: showTicker ? 'monospace' : 'var(--font)',
-            }}
-          >
-            {headlineText}
+          <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+            <div
+              onClick={() => setShowTicker((s) => !s)}
+              title={showTicker ? 'Click for title' : 'Click for ticker'}
+              style={{
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#ffffff',
+                lineHeight: 1.3,
+                overflow: 'hidden',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                textOverflow: 'ellipsis',
+                fontFamily: showTicker ? 'monospace' : 'var(--font)',
+              }}
+            >
+              {headlineText}
+            </div>
+            <PositionIdRow
+              positionId={market.id}
+              copied={marketIdCopied}
+              entityLabel="Market ID"
+              onCopy={(e) => {
+                e.stopPropagation()
+                navigator.clipboard.writeText(market.id)
+                setMarketIdCopied(true)
+                setTimeout(() => setMarketIdCopied(false), 1500)
+              }}
+            />
           </div>
           <button
             type="button"

@@ -1,5 +1,5 @@
-import { apiFetchPublic } from './client';
-import { getApiKey } from '../runtimeConfig';
+import { apiFetchPublic } from './publicFetch';
+import { getApiBase, getApiKey } from '../runtimeConfig';
 
 // ---------------------------------------------------------------------------
 // AUTH
@@ -38,6 +38,6 @@ export async function requestAuthToken(connectedWallet?: string): Promise<TokenR
       headers: { Authorization: `Api-Key ${apiKey}` },
       body: JSON.stringify({ wallet_address: connectedWallet }),
     },
-    TOKEN_BASE_URL,
+    TOKEN_BASE_URL ?? getApiBase(),
   );
 }

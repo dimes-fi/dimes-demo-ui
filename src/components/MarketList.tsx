@@ -108,7 +108,7 @@ export function MarketList({
 
   const queryClient = useQueryClient()
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['markets'] })
+    queryClient.invalidateQueries({ queryKey: ['dimes', 'markets'] })
   }
 
   const markets = page?.data

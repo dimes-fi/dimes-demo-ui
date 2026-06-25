@@ -1,66 +1,15 @@
-import { useReducer, useCallback, useRef } from 'react';
-import {
-  DimesClient,
-  DimesApiError,
-  marketMovedCodes,
-  buildQuoteParams,
-} from '@dimes-dot-fi/sdk';
+import { useCallback, useMemo } from 'react';
+import { useQuoteMachine, type QuoteMachineState } from '@dimes-dot-fi/sdk/react';
+import { buildQuoteParams } from '@dimes-dot-fi/sdk';
 import type { CreateOfferParams, Offer } from '@dimes-dot-fi/sdk';
-import { useAuthStore } from '../store/auth';
-import { getApiBase } from '../runtimeConfig';
 
-const MAX_MARKET_MOVED_RETRIES = 3;
-
-// ── State types ──
-
-export type TradeState =
-  | { phase: 'idle' }
-  | { phase: 'loading-draft' }
-  | { phase: 'draft-ready'; draft: Offer; quotedAt: number }
-  | { phase: 'promoting'; draft: Offer; quotedAt: number }
-  | { phase: 'promoted'; draft: Offer; promotedOffer: Offer; correctedFrom?: Offer; quotedAt: number }
-  | { phase: 'market-moved'; originalDraft: Offer; newDraft: Offer; retryCount: number; quotedAt: number }
-  | { phase: 'error'; error: unknown; draft?: Offer };
-
-type Action =
-  | { type: 'LOADING' }
-  | { type: 'DRAFT_READY'; draft: Offer; quotedAt: number }
-  | { type: 'PROMOTING'; draft: Offer; quotedAt: number }
-  | { type: 'PROMOTED'; draft: Offer; promotedOffer: Offer; correctedFrom?: Offer; quotedAt: number }
-  | { type: 'MARKET_MOVED'; originalDraft: Offer; newDraft: Offer; retryCount: number; quotedAt: number }
-  | { type: 'ERROR'; error: unknown; draft?: Offer }
-  | { type: 'RESET' };
-
-function reducer(_state: TradeState, action: Action): TradeState {
-  switch (action.type) {
-    case 'LOADING':
-      return { phase: 'loading-draft' };
-    case 'DRAFT_READY':
-      return { phase: 'draft-ready', draft: action.draft, quotedAt: action.quotedAt };
-    case 'PROMOTING':
-      return { phase: 'promoting', draft: action.draft, quotedAt: action.quotedAt };
-    case 'PROMOTED':
-      return {
-        phase: 'promoted',
-        draft: action.draft,
-        promotedOffer: action.promotedOffer,
-        correctedFrom: action.correctedFrom,
-        quotedAt: action.quotedAt,
-      };
-    case 'MARKET_MOVED':
-      return {
-        phase: 'market-moved',
-        originalDraft: action.originalDraft,
-        newDraft: action.newDraft,
-        retryCount: action.retryCount,
-        quotedAt: action.quotedAt,
-      };
-    case 'ERROR':
-      return { phase: 'error', error: action.error, draft: action.draft };
-    case 'RESET':
-      return { phase: 'idle' };
-  }
-}
+// ---------------------------------------------------------------------------
+// The interactive draft → review → promote → (market-moved accept) machine now
+// lives in the SDK as `useQuoteMachine`. This hook is a thin adapter that keeps
+// the demo's existing call shape: it maps the panel's param object onto the
+// SDK's `QuoteParams` and renames `promotedQuote` back to `promotedOffer` for
+// the components that still read that field.
+// ---------------------------------------------------------------------------
 
 export interface UseTradeMachineParams {
   marketTicker: string;
@@ -72,17 +21,14 @@ export interface UseTradeMachineParams {
   minFillBps?: number;
 }
 
-// The SDK's CreateOfferParams type predates partial-open; the wire body accepts
-// the two extra fields (the client decamelizes every key, the API camelizes
-// back). Extend the type locally so we can attach them without a cast soup.
 export type OfferParamsWithPartial = CreateOfferParams & {
   allowPartialFill?: boolean;
   minFillBps?: number;
 };
 
-// buildQuoteParams() only computes the five core fields, so re-attach the
-// partial-open opt-in afterward. Omits both fields entirely when not opted in
-// (atomic FOK behaviour is the default).
+// `buildQuoteParams` is now partial-fill aware (it threads allowPartialFill /
+// minFillBps straight through `QuoteParams`), so this is just a compatibility
+// shim for the one caller that still composes params in two steps.
 export function withPartialFill(
   params: CreateOfferParams,
   opts: { allowPartialFill?: boolean; minFillBps?: number },
@@ -95,109 +41,43 @@ export function withPartialFill(
   };
 }
 
-function getClient(): DimesClient {
-  const jwt = useAuthStore.getState().jwt;
-  return new DimesClient({
-    baseUrl: getApiBase(),
-    auth: { getHeaders: async (): Promise<Record<string, string>> => jwt ? { Authorization: `Bearer ${jwt}` } : {} },
-  });
-}
-
-function isMarketMovedError(err: unknown): boolean {
-  if (err instanceof DimesApiError) return marketMovedCodes.has((err as { code: string }).code);
-  if (err && typeof err === 'object' && 'code' in err) {
-    return marketMovedCodes.has((err as { code: string }).code);
-  }
-  return false;
-}
-
 export { buildQuoteParams };
 
-export function useTradeMachine() {
-  const [state, dispatch] = useReducer(reducer, { phase: 'idle' } as TradeState);
-  const lastParamsRef = useRef<CreateOfferParams | null>(null);
-  const quotedAtRef = useRef(0);
+export type TradeState =
+  | { phase: 'idle' }
+  | { phase: 'loading-draft' }
+  | { phase: 'draft-ready'; draft: Offer; quotedAt: number }
+  | { phase: 'promoting'; draft: Offer; quotedAt: number }
+  | { phase: 'promoted'; draft: Offer; promotedOffer: Offer; correctedFrom?: Offer; quotedAt: number }
+  | { phase: 'market-moved'; originalDraft: Offer; newDraft: Offer; retryCount: number; quotedAt: number }
+  | { phase: 'error'; error: unknown; draft?: Offer };
 
-  const getDraft = useCallback(async (params: UseTradeMachineParams) => {
-    dispatch({ type: 'LOADING' });
-    const offerParams = withPartialFill(
-      buildQuoteParams({
+function adaptState(state: QuoteMachineState): TradeState {
+  if (state.phase === 'promoted') {
+    const { promotedQuote, ...rest } = state;
+    return { ...rest, promotedOffer: promotedQuote };
+  }
+  return state;
+}
+
+export function useTradeMachine() {
+  const { state, getDraft: sdkGetDraft, promote, correctAndPromote, acceptChanges, reset } = useQuoteMachine();
+
+  const getDraft = useCallback(
+    (params: UseTradeMachineParams) =>
+      sdkGetDraft({
         marketTicker: params.marketTicker,
         side: params.effectiveSide,
         collateralUsd: params.collateralUsd,
         leverageBps: params.leverageBps,
         slippageBps: params.slippageBps,
+        allowPartialFill: params.allowPartialFill,
+        minFillBps: params.minFillBps,
       }),
-      { allowPartialFill: params.allowPartialFill, minFillBps: params.minFillBps },
-    );
-    lastParamsRef.current = offerParams;
-    try {
-      const client = getClient();
-      const draft = await client.createDraftQuote(offerParams);
-      quotedAtRef.current = Date.now();
-      dispatch({ type: 'DRAFT_READY', draft, quotedAt: quotedAtRef.current });
-    } catch (err) {
-      dispatch({ type: 'ERROR', error: err });
-    }
-  }, []);
+    [sdkGetDraft],
+  );
 
-  const promote = useCallback(async (draft: Offer, retryCount = 0) => {
-    const qa = quotedAtRef.current;
-    dispatch({ type: 'PROMOTING', draft, quotedAt: qa });
-    try {
-      const client = getClient();
-      const promotedOffer = await client.promoteDraftQuote(draft.id);
-      dispatch({ type: 'PROMOTED', draft, promotedOffer, quotedAt: qa });
-    } catch (err) {
-      if (isMarketMovedError(err) && retryCount < MAX_MARKET_MOVED_RETRIES && lastParamsRef.current) {
-        try {
-          const client = getClient();
-          const newDraft = await client.createDraftQuote(lastParamsRef.current);
-          quotedAtRef.current = Date.now();
-          dispatch({
-            type: 'MARKET_MOVED',
-            originalDraft: draft,
-            newDraft,
-            retryCount: retryCount + 1,
-            quotedAt: quotedAtRef.current,
-          });
-        } catch (draftErr) {
-          dispatch({ type: 'ERROR', error: draftErr, draft });
-        }
-      } else {
-        dispatch({ type: 'ERROR', error: err, draft });
-      }
-    }
-  }, []);
+  const adapted = useMemo(() => adaptState(state), [state]);
 
-  const correctAndPromote = useCallback(async (originalDraft: Offer, adjustedParams: CreateOfferParams) => {
-    dispatch({ type: 'PROMOTING', draft: originalDraft, quotedAt: quotedAtRef.current });
-    lastParamsRef.current = adjustedParams;
-    try {
-      const client = getClient();
-      const promotedOffer = await client.createQuote(adjustedParams);
-      quotedAtRef.current = Date.now();
-      dispatch({
-        type: 'PROMOTED',
-        draft: promotedOffer,
-        promotedOffer,
-        correctedFrom: originalDraft,
-        quotedAt: quotedAtRef.current,
-      });
-    } catch (err) {
-      dispatch({ type: 'ERROR', error: err });
-    }
-  }, []);
-
-  const acceptChanges = useCallback(async (newDraft: Offer, retryCount: number) => {
-    await promote(newDraft, retryCount);
-  }, [promote]);
-
-  const reset = useCallback(() => {
-    dispatch({ type: 'RESET' });
-    lastParamsRef.current = null;
-    quotedAtRef.current = 0;
-  }, []);
-
-  return { state, getDraft, promote, correctAndPromote, acceptChanges, reset };
+  return { state: adapted, getDraft, promote, correctAndPromote, acceptChanges, reset };
 }

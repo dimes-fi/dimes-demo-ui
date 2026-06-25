@@ -5,8 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '@rainbow-me/rainbowkit/styles.css'
 import './theme.css'
 import './global.css'
+import { DimesProvider } from '@dimes-dot-fi/sdk/react'
 import { config } from './config'
 import { WalletProviders } from './WalletProviders'
+import { getDimesClient } from './api/dimesClient'
 import App from './App'
 
 const queryClient = new QueryClient()
@@ -22,7 +24,9 @@ if (isPreview) {
       <React.StrictMode>
         <WagmiProvider config={config}>
           <QueryClientProvider client={queryClient}>
-            <Preview />
+            <DimesProvider client={getDimesClient()}>
+              <Preview />
+            </DimesProvider>
           </QueryClientProvider>
         </WagmiProvider>
       </React.StrictMode>,
@@ -32,7 +36,9 @@ if (isPreview) {
   root.render(
     <React.StrictMode>
       <WalletProviders>
-        <App />
+        <DimesProvider client={getDimesClient()}>
+          <App />
+        </DimesProvider>
       </WalletProviders>
     </React.StrictMode>,
   )

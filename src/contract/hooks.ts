@@ -9,10 +9,7 @@ import {
 } from 'wagmi';
 import { parseGwei, getAddress, encodeFunctionData, type PublicClient, type TransactionReceipt } from 'viem';
 import { vaultAbi, erc20Abi } from './abi';
-import {
-  recoverCreatePositionSigner,
-  resolveExpectedSigner,
-} from './verifySignature';
+import { assertQuoteSigner, resolveExpectedSigner } from '@dimes-dot-fi/sdk/contract';
 import { useContractInfo } from '../hooks/useContractInfo';
 import { getUsdcAddress } from '../runtimeConfig';
 import { useAuthStore } from '../store/auth';
@@ -304,20 +301,10 @@ export function useCreatePosition() {
       return;
     }
 
-    let recoveredSigner: `0x${string}`;
     try {
-      recoveredSigner = await recoverCreatePositionSigner(offer);
-    } catch {
-      setVerifyError(new Error('Failed to recover signer from offer signature.'));
-      return;
-    }
-
-    if (getAddress(recoveredSigner) !== expectedSigner) {
-      setVerifyError(
-        new Error(
-          `Offer signature mismatch. Expected ${expectedSigner}, recovered ${getAddress(recoveredSigner)}.`,
-        ),
-      );
+      await assertQuoteSigner(offer, getAddress(offer.authorityPublicKey), expectedSigner);
+    } catch (e) {
+      setVerifyError(e instanceof Error ? e : new Error('Failed to verify offer signature.'));
       return;
     }
 
@@ -412,4 +399,48 @@ export function useRequestClose() {
   const receiptError = receiptFetchError ?? revertError;
 
   return { requestClose, hash, isPending, isConfirming, isSuccess, error, receiptError, simulateError, reset };
+}
+
+export function useRequestPartialClose() {
+  const { writeContract, data: hash, isPending, error, reset: resetWrite } = useWriteContract();
+  const {
+    data: receipt,
+    isLoading: isConfirming,
+    isSuccess: receiptFetched,
+    error: receiptFetchError,
+  } = useWaitForTransactionReceipt({ hash, pollingInterval: 2_000 });
+  const publicClient = usePublicClient();
+  const { address: account } = useAccount();
+  const gasOverrides = useGasOverrides();
+  const [simulateError, setSimulateError] = useState<unknown>(null);
+  const revertError = useRevertError(receipt);
+
+  const reset = () => {
+    setSimulateError(null);
+    resetWrite();
+  };
+
+  const requestPartialClose = async (vaultAddress: string, positionKey: string, closeTokenUnits: bigint) => {
+    setSimulateError(null);
+    const params = {
+      address: vaultAddress as `0x${string}`,
+      abi: vaultAbi,
+      functionName: 'requestPartialClose' as const,
+      args: [positionKey as `0x${string}`, closeTokenUnits] as const,
+    };
+
+    try {
+      await publicClient!.simulateContract({ ...params, account });
+    } catch (e) {
+      setSimulateError(e);
+      return;
+    }
+
+    writeContract({ ...params, ...gasOverrides });
+  };
+
+  const isSuccess = receiptFetched && receipt?.status === 'success';
+  const receiptError = receiptFetchError ?? revertError;
+
+  return { requestPartialClose, hash, isPending, isConfirming, isSuccess, error, receiptError, simulateError, reset };
 }

@@ -1,8 +1,22 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test-setup.ts'],
+    server: {
+      deps: {
+        // The SDK's ESM build does `import { camelizeKeys } from "humps"`, but humps
+        // is CommonJS with no named ESM exports — strict ESM (vitest) throws on load.
+        // Inlining routes the SDK through Vite's transform, which handles the interop.
+        inline: ['@dimes-dot-fi/sdk'],
+      },
+    },
+  },
   server: {
     watch: {
       usePolling: true,

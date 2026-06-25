@@ -23,7 +23,9 @@ export function useMarkets(
   const jwt = useAuthStore((s) => s.jwt);
 
   return useQuery<MarketsPage>({
-    queryKey: ['markets', { category, search, status, acceptingNewPositions, startingAfter, sort }],
+    // The 'dimes','markets' prefix matches the SDK's cache key so useMarketStream's
+    // reconcile mode merges eligibility/leverage deltas straight into this query.
+    queryKey: ['dimes', 'markets', { category, search, status, acceptingNewPositions, startingAfter, sort }],
     queryFn: async () => {
       if (search) {
         const data = await searchMarkets({

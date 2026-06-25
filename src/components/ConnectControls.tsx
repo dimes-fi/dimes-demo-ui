@@ -219,10 +219,19 @@ export function AccountMenuShell({
   base: React.CSSProperties
   actions: MenuAction[]
 }) {
+  // Balance must track the wallet positions actually open from — the smart
+  // account under AA, the deposit wallet in deposit mode, else this pill's
+  // address. Mirrors the header's UsdcBalance so the two never disagree.
+  const smartWalletAddress = useAuthStore((s) => s.smartWalletAddress)
+  const depositWalletMode = useAuthStore((s) => s.depositWalletMode)
+  const depositWalletAddress = useAuthStore((s) => s.depositWalletAddress)
+  const balanceAddress = (smartWalletAddress ??
+    (depositWalletMode ? depositWalletAddress : null) ??
+    address) as `0x${string}` | undefined
   const { data: balance } = useBalance({
-    address,
+    address: balanceAddress,
     token: USDC_ADDRESS,
-    query: { enabled: !!address && !!USDC_ADDRESS },
+    query: { enabled: !!balanceAddress && !!USDC_ADDRESS },
   })
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)

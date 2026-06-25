@@ -1,8 +1,16 @@
 import { useCallback, useState } from 'react'
-import { encodeFunctionData } from 'viem'
+import { encodeFunctionData, getAddress } from 'viem'
 import { usePublicClient } from 'wagmi'
-import { buildApproveTx, buildCreatePositionTx, buildRequestCloseTx } from '@dimes-dot-fi/sdk/contract'
+import {
+  assertQuoteSigner,
+  buildApproveTx,
+  buildCreatePositionTx,
+  buildRequestCloseTx,
+  buildRequestPartialCloseTx,
+  resolveExpectedSigner,
+} from '@dimes-dot-fi/sdk/contract'
 import { getUsdcAddress } from '../runtimeConfig'
+import { useContractInfo } from '../hooks/useContractInfo'
 import { getSmartWalletClient } from './smartWalletClient'
 import type { Offer } from '../api/types'
 
@@ -28,6 +36,7 @@ interface Call {
 
 export function useCreatePositionSmart() {
   const publicClient = usePublicClient()
+  const { data: contractInfo } = useContractInfo()
   const [hash, setHash] = useState<`0x${string}` | null>(null)
   const [isPending, setIsPending] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
@@ -52,6 +61,21 @@ export function useCreatePositionSmart() {
       const client = getSmartWalletClient()
       if (!client) {
         setVerifyError(new Error('Smart wallet not ready.'))
+        return
+      }
+
+      // The smart account is msg.sender; the contract binds the signed `user` to
+      // it, so verify the offer signature against the API's authorized signer
+      // before submitting — fail fast instead of reverting on-chain.
+      const expectedSigner = resolveExpectedSigner(contractInfo?.polygonSignerAddress)
+      if (!expectedSigner) {
+        setVerifyError(new Error('Unable to verify offer: no signer address from /contract-info.'))
+        return
+      }
+      try {
+        await assertQuoteSigner(offer, getAddress(offer.authorityPublicKey), expectedSigner)
+      } catch (e) {
+        setVerifyError(e instanceof Error ? e : new Error('Failed to verify offer signature.'))
         return
       }
 
@@ -87,7 +111,7 @@ export function useCreatePositionSmart() {
         setIsConfirming(false)
       }
     },
-    [publicClient, reset],
+    [publicClient, contractInfo, reset],
   )
 
   return {
@@ -163,6 +187,80 @@ export function useRequestCloseSmart() {
 
   return {
     requestClose,
+    hash,
+    isPending,
+    isConfirming,
+    isSuccess,
+    receiptError,
+    error,
+    verifyError,
+    reset,
+  }
+}
+
+export function useRequestPartialCloseSmart() {
+  const publicClient = usePublicClient()
+  const [hash, setHash] = useState<`0x${string}` | null>(null)
+  const [isPending, setIsPending] = useState(false)
+  const [isConfirming, setIsConfirming] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
+  const [receiptError, setReceiptError] = useState<Error | null>(null)
+  const [verifyError, setVerifyError] = useState<Error | null>(null)
+
+  const reset = useCallback(() => {
+    setHash(null)
+    setIsPending(false)
+    setIsConfirming(false)
+    setIsSuccess(false)
+    setError(null)
+    setReceiptError(null)
+    setVerifyError(null)
+  }, [])
+
+  const requestPartialClose = useCallback(
+    async (vaultAddress: string, positionKey: string, closeTokenUnits: bigint) => {
+      reset()
+      const client = getSmartWalletClient()
+      if (!client) {
+        setVerifyError(new Error('Smart wallet not ready.'))
+        return
+      }
+
+      const partialCloseTx = buildRequestPartialCloseTx(
+        vaultAddress as `0x${string}`,
+        positionKey as `0x${string}`,
+        closeTokenUnits,
+      )
+      const calls: Call[] = [{ to: partialCloseTx.address, data: encodeFunctionData(partialCloseTx), value: 0n }]
+
+      setIsPending(true)
+      let txHash: `0x${string}`
+      try {
+        txHash = await client.sendTransaction({ account: client.account, calls })
+      } catch (e) {
+        setError(e as Error)
+        setIsPending(false)
+        return
+      }
+      setHash(txHash)
+      setIsPending(false)
+      setIsConfirming(true)
+      try {
+        const receipt = await publicClient!.waitForTransactionReceipt({ hash: txHash })
+        if (receipt.status === 'success') setIsSuccess(true)
+        else setReceiptError(new Error('Transaction reverted on-chain.'))
+      } catch (e) {
+        setReceiptError(e as Error)
+      } finally {
+        setIsConfirming(false)
+      }
+    },
+    [publicClient, reset],
+  )
+
+  return {
+    requestPartialClose,
     hash,
     isPending,
     isConfirming,
