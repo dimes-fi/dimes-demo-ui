@@ -5,6 +5,7 @@ import {
   buildDepositWalletBatch,
   buildPushFundedCreateCalls,
   buildRequestCloseCalls,
+  buildRequestPartialCloseCalls,
   getDepositWalletBatchTypedData,
   type DepositWalletCall,
 } from '@dimes-dot-fi/sdk/contract';
@@ -14,7 +15,7 @@ import { useAuthStore } from '../store/auth';
 import { getBuilderCreds, hasBuilderCreds } from '../store/builderCreds';
 import type { Offer } from '../api/types';
 import { USDC_ADDRESS } from './hooks';
-import { recoverCreatePositionSigner, resolveExpectedSigner } from './verifySignature';
+import { assertQuoteSigner, resolveExpectedSigner } from '@dimes-dot-fi/sdk/contract';
 
 // The deposit-wallet batch must be submitted before this deadline (unix seconds).
 const BATCH_DEADLINE_WINDOW_SECONDS = 600n;
@@ -196,13 +197,9 @@ export function useCreatePositionPushFunded() {
       return;
     }
     try {
-      const recovered = await recoverCreatePositionSigner(offer);
-      if (recovered.toLowerCase() !== expectedSigner.toLowerCase()) {
-        setVerifyError(new Error(`Offer signature mismatch. Expected ${expectedSigner}.`));
-        return;
-      }
-    } catch {
-      setVerifyError(new Error('Failed to recover signer from offer signature.'));
+      await assertQuoteSigner(offer, getAddress(offer.authorityPublicKey), expectedSigner);
+    } catch (e) {
+      setVerifyError(e instanceof Error ? e : new Error('Failed to verify offer signature.'));
       return;
     }
 
@@ -238,6 +235,34 @@ export function useRequestClosePushFunded() {
 
   return {
     requestClose,
+    isPending: state.isPending,
+    isConfirming: state.isConfirming,
+    isSuccess: state.isSuccess,
+    transactionHash: state.transactionHash,
+    verifyError: state.verifyError,
+    error: state.error,
+    receiptError: state.receiptError,
+    reset,
+  };
+}
+
+/**
+ * Partial-close a position from a Polymarket deposit wallet — a single-call
+ * `requestPartialClose` wrapped in the same deposit-wallet batch.
+ */
+export function useRequestPartialClosePushFunded() {
+  const { state, reset, run } = usePushFundedBatch();
+
+  const requestPartialClose = async (
+    vaultAddress: string,
+    positionKey: string,
+    closeTokenUnits: bigint,
+  ): Promise<void> => {
+    await run(() => buildRequestPartialCloseCalls(vaultAddress, positionKey, closeTokenUnits));
+  };
+
+  return {
+    requestPartialClose,
     isPending: state.isPending,
     isConfirming: state.isConfirming,
     isSuccess: state.isSuccess,
