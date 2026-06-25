@@ -7,9 +7,10 @@ import type {
 } from '../api/types'
 import { isOpenPosition, getOriginationFeeBreakdown } from '../api/types'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRequestClose } from '../contract/hooks'
-import { useRequestClosePushFunded } from '../contract/pushFundedHooks'
-import { useRequestCloseSmart } from '../contract/smartWalletHooks'
+import { useRequestClose, useRequestPartialClose } from '../contract/hooks'
+import { useRequestClosePushFunded, useRequestPartialClosePushFunded } from '../contract/pushFundedHooks'
+import { useRequestCloseSmart, useRequestPartialCloseSmart } from '../contract/smartWalletHooks'
+import { PartialCloseSlider } from './PartialCloseSlider'
 import { useCancelPosition } from '../hooks/useCancelPosition'
 import { useContractInfo } from '../hooks/useContractInfo'
 import { useAuthStore } from '../store/auth'
@@ -227,14 +228,42 @@ function OpenPositionDetail({
       : eoaClose.simulateError
   const resetClose = activeClose.reset
 
+  // Partial-close routing mirrors close: AA smart wallet > deposit-wallet > EOA.
+  const eoaPartialClose = useRequestPartialClose()
+  const pushFundedPartialClose = useRequestPartialClosePushFunded()
+  const smartPartialClose = useRequestPartialCloseSmart()
+  const activePartialClose = smartWalletMode
+    ? smartPartialClose
+    : depositWalletMode
+      ? pushFundedPartialClose
+      : eoaPartialClose
+  const requestPartialClose = activePartialClose.requestPartialClose
+  const isPartialCloseSigning = activePartialClose.isPending
+  const isPartialCloseConfirming = activePartialClose.isConfirming
+  const isPartialCloseConfirmed = activePartialClose.isSuccess
+  const partialCloseChainError = activePartialClose.error
+  const partialCloseReceiptError = activePartialClose.receiptError
+  const partialCloseSimError = smartWalletMode
+    ? smartPartialClose.verifyError
+    : depositWalletMode
+      ? pushFundedPartialClose.verifyError
+      : eoaPartialClose.simulateError
+  const resetPartialClose = activePartialClose.reset
+
   const displayTitle = position.marketTitle || position.marketTicker
   const isYes = position.side === 'yes'
 
   useEffect(() => {
     if (isCloseConfirmed) {
-      queryClient.invalidateQueries({ queryKey: ['positions'] })
+      queryClient.invalidateQueries({ queryKey: ['dimes', 'positions'] })
     }
   }, [isCloseConfirmed, queryClient])
+
+  useEffect(() => {
+    if (isPartialCloseConfirmed) {
+      queryClient.invalidateQueries({ queryKey: ['dimes', 'positions'] })
+    }
+  }, [isPartialCloseConfirmed, queryClient])
 
   const isPendingPosition = position.status === 'pending'
   const isOpenPos = position.status === 'open'
@@ -267,6 +296,40 @@ function OpenPositionDetail({
     if (isPendingPosition) cancelMutation.reset()
     else resetClose()
   }
+
+  const pendingOperation = position.pendingOperation
+  const minPartialCloseTokenUnits = position.current.minPartialCloseTokenUnits
+  const maxPartialCloseTokenUnits = position.current.maxPartialCloseTokenUnits
+  const isPartialCloseable =
+    isOpenPos &&
+    pendingOperation == null &&
+    minPartialCloseTokenUnits != null &&
+    maxPartialCloseTokenUnits != null &&
+    BigInt(maxPartialCloseTokenUnits) >= BigInt(minPartialCloseTokenUnits)
+
+  const isPartialCloseBusy = isPartialCloseSigning || isPartialCloseConfirming
+  const [reducing, setReducing] = useState(false)
+  const [partialCloseUnits, setPartialCloseUnits] = useState<bigint | null>(null)
+  const partialCloseError: unknown = partialCloseSimError ?? partialCloseChainError ?? partialCloseReceiptError
+
+  const beginReduce = () => {
+    if (minPartialCloseTokenUnits == null) return
+    setPartialCloseUnits(BigInt(minPartialCloseTokenUnits))
+    setReducing(true)
+  }
+
+  const handlePartialClose = () => {
+    if (isPartialCloseBusy || partialCloseUnits == null) return
+    if (!contractInfo?.polygonVaultContractAddress) return
+    requestPartialClose(contractInfo.polygonVaultContractAddress, position.onChainPositionKey, partialCloseUnits)
+  }
+
+  const partialCloseButtonLabel = (() => {
+    if (isPartialCloseSigning) return 'Confirm in wallet...'
+    if (isPartialCloseConfirming) return 'Reducing...'
+    if (isPartialCloseConfirmed) return 'Reduce requested'
+    return 'Confirm reduction'
+  })()
 
   const buttonLabel = (() => {
     if (cancelMutation.isPending) return 'Cancelling...'
@@ -645,7 +708,113 @@ function OpenPositionDetail({
           </div>
         )}
 
+        {isOpenPos && pendingOperation?.type === 'partial_close' && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: '10px 14px',
+              border: '1px solid rgba(245,166,35,0.3)',
+              background: 'rgba(245,166,35,0.06)',
+              color: '#F5A623',
+              fontSize: 12,
+            }}
+          >
+            Reducing position… a slice is being sold on-chain.
+          </div>
+        )}
+
+        {isPartialCloseable && !confirming && !reducing && (
+          <button
+            onClick={() => {
+              if (partialCloseError) {
+                handlePartialClose()
+                return
+              }
+              beginReduce()
+            }}
+            disabled={isBusy || isPartialCloseBusy}
+            style={{
+              width: '100%',
+              padding: '12px 0',
+              borderRadius: 0,
+              border: '1px solid rgba(238,255,0,0.25)',
+              background: 'transparent',
+              color: isBusy || isPartialCloseBusy ? 'rgba(255,255,255,0.3)' : 'var(--yellow)',
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: isBusy || isPartialCloseBusy ? 'not-allowed' : 'pointer',
+              fontFamily: 'var(--font)',
+              marginTop: 10,
+              transition: 'border-color 0.2s',
+            }}
+          >
+            {isPartialCloseBusy ? partialCloseButtonLabel : 'Reduce position'}
+          </button>
+        )}
+
+        {isPartialCloseable && reducing && partialCloseUnits != null && minPartialCloseTokenUnits != null && maxPartialCloseTokenUnits != null && (
+          <div
+            style={{
+              marginTop: 16,
+              border: '1px solid rgba(238,255,0,0.2)',
+              padding: '14px 16px',
+              background: 'rgba(255,255,255,0.03)',
+            }}
+          >
+            <PartialCloseSlider
+              currentTokenUnits={BigInt(position.current.positionTokenUnits)}
+              minTokenUnits={BigInt(minPartialCloseTokenUnits)}
+              maxTokenUnits={BigInt(maxPartialCloseTokenUnits)}
+              positionValueUsdPips={position.current.positionValueUsdPips}
+              value={partialCloseUnits}
+              onChange={setPartialCloseUnits}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button
+                onClick={() => setReducing(false)}
+                disabled={isPartialCloseBusy}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  borderRadius: 0,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'transparent',
+                  color: 'rgba(255,255,255,0.6)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: isPartialCloseBusy ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--font)',
+                }}
+              >
+                Keep size
+              </button>
+              <button
+                onClick={() => {
+                  setReducing(false)
+                  handlePartialClose()
+                }}
+                disabled={isPartialCloseBusy}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  borderRadius: 0,
+                  border: '1px solid rgba(238,255,0,0.4)',
+                  background: 'rgba(238,255,0,0.08)',
+                  color: 'var(--yellow)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: isPartialCloseBusy ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--font)',
+                }}
+              >
+                {partialCloseButtonLabel}
+              </button>
+            </div>
+          </div>
+        )}
+
         <ErrorBanner error={actionError} onDismiss={dismissError} />
+        <ErrorBanner error={partialCloseError} onDismiss={resetPartialClose} />
       </div>
     </div>
   )

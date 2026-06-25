@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useDisconnect, useAccount, useBalance } from 'wagmi'
+import { useAccount, useBalance } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { useWalletKind } from '../contract/useWalletKind'
@@ -200,7 +200,7 @@ function MintUsdcButton() {
     if (!isSuccess) return
     queryClient.invalidateQueries()
     addToast({
-      title: `Minted ${MINT_AMOUNT.toLocaleString()} test pUSD`,
+      title: `Minted ${MINT_AMOUNT.toLocaleString()} test sUSDC`,
       variant: 'success',
       durationMs: 4000,
     })
@@ -215,6 +215,8 @@ function MintUsdcButton() {
       description: formatContractError(err).message,
       variant: 'error',
       durationMs: 6000,
+      error: err,
+      context: { action: 'mint', amount: MINT_AMOUNT },
     })
     reset()
   }, [simulateError, error, receiptError, addToast, reset])
@@ -224,7 +226,7 @@ function MintUsdcButton() {
       type="button"
       onClick={() => mint(MINT_AMOUNT)}
       disabled={busy}
-      title="Mint test pUSD to your wallet (sandbox only)"
+      title="Mint test sUSDC to your wallet (sandbox only)"
       style={{
         padding: '8px 12px',
         fontSize: 'var(--fs-sm)',
@@ -239,7 +241,7 @@ function MintUsdcButton() {
         opacity: busy ? 0.6 : 1,
       }}
     >
-      {isConfirming ? 'Minting…' : isPending ? 'Confirm in wallet…' : 'Get test pUSD'}
+      {isConfirming ? 'Minting…' : isPending ? 'Confirm in wallet…' : 'Get test sUSDC'}
     </button>
   )
 }
@@ -496,18 +498,11 @@ function DimesLogo() {
 }
 
 export function Header() {
-  const { disconnect } = useDisconnect()
   const { isConnected } = useAccount()
-  const clearAuth = useAuthStore((state) => state.clearAuth)
   // Until an API key is set there's no environment/balance to act on, so hide
   // the settings, faucet and balance controls. (Key changes force a reload, so
   // reading it at render stays coherent.)
   const hasApiKey = Boolean(getApiKey())
-
-  const handleLogout = () => {
-    clearAuth()
-    disconnect()
-  }
 
   return (
     <header
@@ -528,16 +523,6 @@ export function Header() {
         {isConnected && <WalletKindBadge />}
         {isConnected && hasApiKey && isSandbox() && <MintUsdcButton />}
         {isConnected && hasApiKey && <UsdcBalance />}
-        {isConnected && (
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="btn btn--ghost"
-            style={{ padding: '8px 14px', fontSize: 'var(--fs-sm)' }}
-          >
-            Logout
-          </button>
-        )}
         <CompactConnectButton />
       </div>
     </header>
