@@ -1,5 +1,6 @@
 import { useTurnkey, AuthState } from '@turnkey/react-wallet-kit'
 import { useAccount } from 'wagmi'
+import { isTestnet } from '../config'
 import { useDisplayWallet } from '../hooks/useDisplayWallet'
 import { AccountMenuShell } from '../components/ConnectControls'
 import { btnStyle, shorten, type MenuAction } from '../components/connectShared'
@@ -51,9 +52,11 @@ export default function TurnkeyControls({ compact }: { compact: boolean }) {
 
   return (
     <div style={{ display: 'inline-flex', gap: 8 }}>
-      <button type="button" style={{ ...base, cursor: 'default' }} disabled>
-        Polygon
-      </button>
+      {isTestnet && (
+        <button type="button" style={{ ...base, cursor: 'default' }} disabled>
+          Amoy
+        </button>
+      )}
       <AccountMenuShell
         address={address!}
         label={shorten(displayWallet ?? address!)}

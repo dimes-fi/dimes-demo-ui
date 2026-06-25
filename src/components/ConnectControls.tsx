@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { usePrivy, useFundWallet, useExportWallet } from '@privy-io/react-auth'
-import { useAccount, useBalance, useChainId, useSwitchChain } from 'wagmi'
+import { useAccount, useBalance, useChainId, useDisconnect, useSwitchChain } from 'wagmi'
+import { polygon } from 'wagmi/chains'
 import { formatUnits } from 'viem'
 import { getUsdcAddress, walletBackend } from '../runtimeConfig'
 import { useDisplayWallet } from '../hooks/useDisplayWallet'
@@ -95,16 +96,18 @@ function RainbowControls({ compact }: { compact: boolean }) {
               }
               return (
                 <>
-                  <button onClick={openChainModal} type="button" style={base}>
-                    {chain.hasIcon && chain.iconUrl && (
-                      <img
-                        alt={chain.name ?? 'Chain'}
-                        src={chain.iconUrl}
-                        style={{ width: 14, height: 14, borderRadius: '50%' }}
-                      />
-                    )}
-                    {chain.name}
-                  </button>
+                  {chain.id !== polygon.id && (
+                    <button onClick={openChainModal} type="button" style={base}>
+                      {chain.hasIcon && chain.iconUrl && (
+                        <img
+                          alt={chain.name ?? 'Chain'}
+                          src={chain.iconUrl}
+                          style={{ width: 14, height: 14, borderRadius: '50%' }}
+                        />
+                      )}
+                      {chain.name}
+                    </button>
+                  )}
                   <button onClick={openAccountModal} type="button" style={base}>
                     {displayWallet ? shorten(displayWallet) : account.displayName}
                   </button>
@@ -185,9 +188,11 @@ function PrivyControls({ compact }: { compact: boolean }) {
         }
         return (
           <>
-            <button type="button" style={{ ...base, cursor: 'default' }} disabled>
-              {chain?.name ?? 'Polygon'}
-            </button>
+            {chain && chain.id !== polygon.id && (
+              <button type="button" style={{ ...base, cursor: 'default' }} disabled>
+                {chain.name}
+              </button>
+            )}
             <PrivyAccountMenu
               address={activeAddress!}
               label={shorten(displayWallet ?? activeAddress!)}
@@ -342,22 +347,28 @@ function PrivyAccountMenu({
   label: string
   base: React.CSSProperties
 }) {
-  const { user, logout } = usePrivy()
+  const { user, logout, authenticated } = usePrivy()
   const { fundWallet } = useFundWallet()
   const { exportWallet } = useExportWallet()
+  const { disconnect } = useDisconnect()
 
   // Export only applies to Privy embedded wallets; external wallets keep keys.
   const isEmbedded = user?.wallet?.walletClientType === 'privy'
 
-  // Logout = Privy logout() only. The SmartWalletBridge tears down wagmi + the
-  // scoped auth once Privy flips to unauthenticated (doing it here would
-  // interrupt logout and leave Privy half-logged-in).
+  // Disconnect path depends on how the wallet got connected:
+  // - Privy login (authenticated): logout() only. The SmartWalletBridge tears
+  //   down wagmi + scoped auth once Privy flips to unauthenticated (doing it
+  //   here would interrupt logout and leave Privy half-logged-in).
+  // - External wallet via connectWallet() (authenticated stays false): there's
+  //   no Privy session, so logout() is a no-op — disconnect wagmi directly.
+  //   useAutoAuth clears the JWT once the address is gone.
+  const onDisconnect = () => (authenticated ? void logout() : disconnect())
   const actions: MenuAction[] = [
     { label: 'Fund wallet', onClick: () => void fundWallet({ address }) },
     ...(isEmbedded
       ? [{ label: 'Export wallet key', onClick: () => void exportWallet({ address }) }]
       : []),
-    { label: 'Disconnect', onClick: () => void logout(), danger: true },
+    { label: 'Disconnect', onClick: onDisconnect, danger: true },
   ]
 
   return <AccountMenuShell address={address} label={label} base={base} actions={actions} />

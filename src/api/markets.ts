@@ -44,7 +44,7 @@ export interface SearchMarketsParams {
 
 /** Search markets by title, ticker, or token ID */
 export async function searchMarkets(params: SearchMarketsParams): Promise<Market[]> {
-  const page = await getDimesClient().searchMarkets({
+  const page = await getDimesClient().getMarkets({
     query: params.query,
     category: params.category,
     status: params.status,

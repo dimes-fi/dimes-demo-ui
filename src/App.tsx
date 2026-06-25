@@ -89,7 +89,14 @@ function App() {
             key. Wallet auto-reconnect is held off until a key exists (see
             WalletProviders). */}
         {!hasApiKey && (
-          <div style={{ padding: '48px 0', display: 'flex', justifyContent: 'center' }}>
+          <div
+            style={{
+              minHeight: 'calc(100vh - 48px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             <ApiKeyGate title="An API key is required to continue" />
           </div>
         )}

@@ -158,15 +158,16 @@ export function isBackendConfigured(b: WalletBackend): boolean {
  * Which wallet stack mounts. Privy and Turnkey each need their own provider
  * stack, so they can't co-mount — instead the home page is a selector that
  * persists a choice here and reloads into that stack (same reload pattern as
- * applySettings). Precedence: explicit user selection > Privy > Turnkey >
- * RainbowKit. Fixed for the page's lifetime, so the choice never flips between
- * renders.
+ * applySettings). Precedence: explicit user selection > Privy > RainbowKit.
+ * Turnkey is never an auto-default — only an explicit selection mounts it.
+ * Fixed for the page's lifetime, so the choice never flips between renders.
  */
 export function walletBackend(): WalletBackend {
   const selected = ss()?.getItem(BACKEND_KEY) as WalletBackend | null
   if (selected && isBackendConfigured(selected)) return selected
   if (getPrivyAppId()) return 'privy'
-  if (getTurnkeyOrgId() && getTurnkeyAuthProxyConfigId()) return 'turnkey'
+  // Turnkey is never an auto-default — it's only reached by explicit selection
+  // (the home page's "Connect with Turnkey" switch).
   return 'rainbowkit'
 }
 

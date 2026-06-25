@@ -9,7 +9,7 @@ import {
   getDepositWalletBatchTypedData,
   type DepositWalletCall,
 } from '@dimes-dot-fi/sdk/contract';
-import { submitRelayerBatch, submitRelayerBatchDirect } from '../api/relayer';
+import { getRelayerNonce, submitRelayerBatch, submitRelayerBatchDirect } from '../api/relayer';
 import { useContractInfo } from '../hooks/useContractInfo';
 import { useAuthStore } from '../store/auth';
 import { getBuilderCreds, hasBuilderCreds } from '../store/builderCreds';
@@ -103,11 +103,15 @@ function usePushFundedBatch() {
     let nonce: bigint;
     try {
       calls = buildCalls();
-      nonce = await publicClient.readContract({
-        address: depositWallet,
-        abi: depositWalletNonceAbi,
-        functionName: 'nonce',
-      });
+      // Direct-relayer path must sign against the relayer's nonce (GET /nonce);
+      // the backend path signs against the on-chain contract nonce.
+      nonce = hasBuilderCreds
+        ? await getRelayerNonce(ownerAddress)
+        : await publicClient.readContract({
+            address: depositWallet,
+            abi: depositWalletNonceAbi,
+            functionName: 'nonce',
+          });
     } catch (e) {
       setState({ ...initialState, verifyError: toError(e, 'Failed to prepare the deposit-wallet batch.') });
       return;

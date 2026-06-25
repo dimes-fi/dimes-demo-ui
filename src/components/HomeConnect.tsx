@@ -3,7 +3,6 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { usePrivy } from '@privy-io/react-auth'
 import {
   walletBackend,
-  isBackendConfigured,
   selectBackend,
   consumeAutoConnect,
   type WalletBackend,
@@ -23,36 +22,6 @@ import { useAuthStore } from '../store/auth'
 // "connect a wallet".
 // ---------------------------------------------------------------------------
 
-const comingSoonBtn: React.CSSProperties = {
-  padding: '11px 18px',
-  fontSize: 13,
-  fontWeight: 600,
-  borderRadius: 0,
-  border: '1px dashed var(--border)',
-  background: 'transparent',
-  color: 'var(--text-dim)',
-  cursor: 'not-allowed',
-  fontFamily: 'var(--font)',
-  lineHeight: 1.2,
-  width: '100%',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 8,
-}
-
-/** Turnkey isn't shipped yet — show it as a disabled "coming soon" affordance. */
-function TurnkeyComingSoon() {
-  return (
-    <button type="button" style={comingSoonBtn} disabled title="Turnkey support is coming soon">
-      Connect with Turnkey
-      <span style={{ fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-        Coming soon
-      </span>
-    </button>
-  )
-}
-
 export function Stack({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: 300, maxWidth: '100%' }}>
@@ -61,30 +30,59 @@ export function Stack({ children }: { children: React.ReactNode }) {
   )
 }
 
-/** "Switch to another configured backend" button — persists + reloads. */
-export function SwitchButton({ to, label }: { to: WalletBackend; label: string }) {
-  if (!isBackendConfigured(to)) return null
-  return (
-    <button type="button" style={secondaryBtn} onClick={() => selectBackend(to)}>
-      {label}
-    </button>
-  )
+/** Persist a backend choice and reload into its stack. */
+const switchTo = (to: WalletBackend) => () => selectBackend(to)
+
+export interface HomeActions {
+  /** "Connect a wallet" — external wallet (or switch to a stack that has one). */
+  onConnectWallet: () => void
+  /** "Connect with Privy". */
+  onConnectPrivy: () => void
+  /** "Polymarket deposit wallet" — connect the owner of a deposit wallet. */
+  onDepositWallet: () => void
+  /** "Connect with Turnkey". */
+  onConnectTurnkey: () => void
+  /** RainbowKit's modal isn't ready on first paint; hide the primary until then. */
+  primaryReady?: boolean
 }
 
-/** Connect through a Polymarket deposit wallet. Records the deposit-wallet
- *  intent, then connects the owner wallet — the app scopes auth + quotes to the
- *  deposit wallet (push-funded flow). The header shows a red status if no
- *  deposit wallet is available for the connection. */
-function DepositWalletButton({ onConnectOwner }: { onConnectOwner: () => void }) {
+/**
+ * The single source of truth for the pre-connect button layout. Every backend's
+ * home renders THIS — identical buttons, order, and styling — and only swaps the
+ * handlers (native action for the active backend, switch+reload for the others).
+ * Order is fixed: Connect a wallet · Privy · deposit · Turnkey (Turnkey last).
+ */
+export function HomeButtons({
+  onConnectWallet,
+  onConnectPrivy,
+  onDepositWallet,
+  onConnectTurnkey,
+  primaryReady = true,
+}: HomeActions) {
   return (
-    <button
-      type="button"
-      style={secondaryBtn}
-      onClick={onConnectOwner}
-      title="Connect the wallet that owns a Polymarket deposit wallet — trades route through the push-funded flow scoped to that deposit wallet."
-    >
-      Polymarket deposit wallet
-    </button>
+    <Stack>
+      <button
+        type="button"
+        style={{ ...primaryBtn, opacity: primaryReady ? 1 : 0 }}
+        onClick={onConnectWallet}
+      >
+        Connect a wallet
+      </button>
+      <button type="button" style={secondaryBtn} onClick={onConnectPrivy}>
+        Connect with Privy
+      </button>
+      <button
+        type="button"
+        style={secondaryBtn}
+        onClick={onDepositWallet}
+        title="Connect the wallet that owns a Polymarket deposit wallet — trades route through the push-funded flow scoped to that deposit wallet."
+      >
+        Polymarket deposit wallet
+      </button>
+      <button type="button" style={secondaryBtn} onClick={onConnectTurnkey}>
+        Connect with Turnkey
+      </button>
+    </Stack>
   )
 }
 
@@ -116,35 +114,21 @@ function PrivyHome() {
   }, [login])
 
   return (
-    <Stack>
-      <button
-        type="button"
-        style={primaryBtn}
-        onClick={() => {
-          setWantsDepositWallet(false)
-          connectWallet()
-        }}
-      >
-        Connect a wallet
-      </button>
-      <button
-        type="button"
-        style={secondaryBtn}
-        onClick={() => {
-          setWantsDepositWallet(false)
-          login()
-        }}
-      >
-        Connect with Privy
-      </button>
-      <DepositWalletButton
-        onConnectOwner={() => {
-          setWantsDepositWallet(true)
-          connectWallet()
-        }}
-      />
-      <TurnkeyComingSoon />
-    </Stack>
+    <HomeButtons
+      onConnectWallet={() => {
+        setWantsDepositWallet(false)
+        connectWallet()
+      }}
+      onConnectPrivy={() => {
+        setWantsDepositWallet(false)
+        login()
+      }}
+      onDepositWallet={() => {
+        setWantsDepositWallet(true)
+        connectWallet()
+      }}
+      onConnectTurnkey={switchTo('turnkey')}
+    />
   )
 }
 
@@ -153,26 +137,19 @@ function RainbowHome() {
   return (
     <ConnectButton.Custom>
       {({ openConnectModal, mounted }) => (
-        <Stack>
-          <button
-            type="button"
-            style={{ ...primaryBtn, opacity: mounted ? 1 : 0 }}
-            onClick={() => {
-              setWantsDepositWallet(false)
-              openConnectModal()
-            }}
-          >
-            Connect a wallet
-          </button>
-          <SwitchButton to="privy" label="Connect with Privy" />
-          <DepositWalletButton
-            onConnectOwner={() => {
-              setWantsDepositWallet(true)
-              openConnectModal()
-            }}
-          />
-          <TurnkeyComingSoon />
-        </Stack>
+        <HomeButtons
+          primaryReady={mounted}
+          onConnectWallet={() => {
+            setWantsDepositWallet(false)
+            openConnectModal()
+          }}
+          onConnectPrivy={switchTo('privy')}
+          onDepositWallet={() => {
+            setWantsDepositWallet(true)
+            openConnectModal()
+          }}
+          onConnectTurnkey={switchTo('turnkey')}
+        />
       )}
     </ConnectButton.Custom>
   )

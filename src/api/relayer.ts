@@ -29,6 +29,21 @@ export interface SubmitRelayerBatchParams {
   signature: string;
 }
 
+/**
+ * Fetch the deposit-wallet batch nonce the Polymarket relayer signs against.
+ * Unauthenticated GET; `address` is the owner EOA, not the deposit wallet.
+ * The relayer tracks in-flight nonces, so this can differ from the contract's
+ * `nonce()` view — sign the batch against THIS value or the relayer 500s.
+ */
+export async function getRelayerNonce(ownerAddress: string): Promise<bigint> {
+  const response = await fetch(`${POLYMARKET_RELAYER_URL}/nonce?address=${ownerAddress}&type=WALLET`);
+  if (!response.ok) {
+    throw new Error(`Polymarket relayer /nonce returned ${response.status}: ${await response.text()}`);
+  }
+  const { nonce } = (await response.json()) as { nonce: string };
+  return BigInt(nonce);
+}
+
 export interface RelayerSubmissionResult {
   transactionHash: string;
   status: string;
@@ -74,7 +89,8 @@ export async function submitRelayerBatch(params: SubmitRelayerBatchParams): Prom
 }
 
 function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
-  const binary = atob(base64);
+  // Polymarket builder secrets are base64url-encoded; atob needs standard base64.
+  const binary = atob(base64.replaceAll('-', '+').replaceAll('_', '/'));
   const bytes = new Uint8Array(new ArrayBuffer(binary.length));
   for (let i = 0; i < binary.length; i += 1) {
     bytes[i] = binary.charCodeAt(i);
@@ -171,6 +187,9 @@ export async function submitRelayerBatchDirect(
   const body = JSON.stringify(payload);
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const hmac = await signRelayerRequest(creds.apiSecret, `${timestamp}POST/submit${body}`);
+
+  // eslint-disable-next-line no-console -- temporary relayer 500 diagnosis
+  console.log('[relayer] /submit payload', { apiKey: creds.apiKey, timestamp, payload });
 
   const response = await fetch(`${POLYMARKET_RELAYER_URL}/submit`, {
     method: 'POST',

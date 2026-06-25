@@ -310,7 +310,7 @@ export function TradePanel({
       collateralUsd: Number(collateralUsd),
       slippageBps,
       allowPartialFill,
-      minFillBps,
+      ...(allowPartialFill ? { minFillBps } : {}),
     })
   }
 
