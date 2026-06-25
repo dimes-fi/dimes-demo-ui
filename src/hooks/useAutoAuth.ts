@@ -3,7 +3,7 @@ import { useAccount } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/auth';
 import { requestAuthToken } from '../api/auth';
-import { ApiError } from '../api/client';
+import { DimesApiError as ApiError } from '@dimes-dot-fi/sdk';
 import { useToastStore } from '../store/toasts';
 import { useDisplayWallet } from './useDisplayWallet';
 
@@ -43,7 +43,7 @@ export function useAutoAuth() {
     // caches so we never show the previous wallet's positions/data.
     if (effectiveAddress !== lastEffectiveAddress.current) {
       lastEffectiveAddress.current = effectiveAddress;
-      queryClient.removeQueries({ queryKey: ['positions'] });
+      queryClient.removeQueries({ queryKey: ['dimes', 'positions'] });
     }
 
     function clearTimer() {

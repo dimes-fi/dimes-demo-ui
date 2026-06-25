@@ -24,7 +24,7 @@ export function useCancelPosition() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['positions'] });
+      queryClient.invalidateQueries({ queryKey: ['dimes', 'positions'] });
     },
     onError: (err: Error) => {
       console.warn('[cancel-position] failed:', err);

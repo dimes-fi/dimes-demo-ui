@@ -1,6 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { PositionSocket } from '@dimes-dot-fi/sdk/ws'
+import { usePositionStream } from '@dimes-dot-fi/sdk/react'
 import type { NotificationEvent, PositionEvent } from '@dimes-dot-fi/sdk/ws'
 import type { Position } from '../api/types'
 import { useAuthStore } from '../store/auth'
@@ -9,23 +7,37 @@ import { usePartialOpenStore } from '../store/partialOpen'
 import { useToastStore } from '../store/toasts'
 import { toastForPositionEvent } from '../utils/position-events'
 import { fillProgressLabel } from '../utils/partialFill'
-import { getApiBase } from '../runtimeConfig'
 
-export const wsTimestamps = new Map<string, number>()
-
-const API_BASE = getApiBase()
-
+/**
+ * Live position updates. The SDK's `usePositionStream` (reconcile mode) owns the
+ * socket lifecycle, reconnect-on-token, pause-on-hidden, and merging events into
+ * the `usePositions` cache. This hook only contributes the demo-specific side
+ * effects — pending-stub cleanup, toasts, and the partial-open progress store —
+ * through the callbacks.
+ */
 export function usePositionSocket() {
   const walletAddress = useAuthStore((s) => s.walletAddress)
-  const queryClient = useQueryClient()
-  const socketRef = useRef<PositionSocket | null>(null)
   const addToast = useToastStore((s) => s.add)
   const removePending = usePendingPositionsStore((s) => s.remove)
   const setPartialProgress = usePartialOpenStore((s) => s.setProgress)
   const setFloorMissed = usePartialOpenStore((s) => s.setFloorMissed)
 
-  const handleNotification = useCallback(
-    (event: NotificationEvent) => {
+  usePositionStream({
+    enabled: !!walletAddress,
+    mode: 'reconcile',
+    onEvent: (event: PositionEvent) => {
+      const position = event.data as Position
+      if (
+        event.type === 'position.created' ||
+        event.type === 'position.opening' ||
+        event.type === 'position.opened'
+      ) {
+        removePending(position.onChainPositionKey)
+      }
+      const ticker = position.marketTitle ?? position.marketTicker
+      addToast(toastForPositionEvent(event.type, ticker))
+    },
+    onNotification: (event: NotificationEvent) => {
       const { code, message, params } = event.data
       const positionId = typeof params?.positionId === 'string' ? params.positionId : null
 
@@ -72,90 +84,5 @@ export function usePositionSocket() {
         durationMs: 5000,
       })
     },
-    [addToast, setPartialProgress, setFloorMissed],
-  )
-
-  const handleEvent = useCallback(
-    (event: PositionEvent) => {
-      const position = event.data as Position
-      const positionId = position.id
-
-      queryClient.setQueriesData<Position[]>(
-        { queryKey: ['positions'] },
-        (old) => {
-          if (!old) return old
-          const idx = old.findIndex((p) => p.id === positionId)
-          if (idx >= 0) {
-            const updated = [...old]
-            updated[idx] = position
-            return updated
-          }
-          if (event.type === 'position.created') {
-            return [position, ...old]
-          }
-          return old
-        },
-      )
-
-      wsTimestamps.set(positionId, Date.now())
-
-      if (
-        event.type === 'position.created' ||
-        event.type === 'position.opening' ||
-        event.type === 'position.opened'
-      ) {
-        removePending(position.onChainPositionKey)
-      }
-
-      const ticker = position.marketTitle ?? position.marketTicker
-      addToast(toastForPositionEvent(event.type, ticker))
-    },
-    [queryClient, addToast, removePending],
-  )
-
-  useEffect(() => {
-    if (!walletAddress) {
-      socketRef.current?.disconnect()
-      socketRef.current = null
-      return
-    }
-
-    const socket = new PositionSocket({
-      baseUrl: API_BASE,
-      getToken: () => useAuthStore.getState().jwt,
-    })
-
-    const unsubEvent = socket.on('*', handleEvent)
-    const unsubNotification = socket.onNotification(handleNotification)
-
-    let isFirstConnect = true
-    const unsubReconnect = socket.onConnect(() => {
-      if (isFirstConnect) {
-        isFirstConnect = false
-        return
-      }
-      queryClient.invalidateQueries({ queryKey: ['positions'] })
-    })
-
-    const handleVisibility = () => {
-      if (document.hidden) {
-        socket.disconnect()
-      } else {
-        socket.connect()
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-
-    socket.connect()
-    socketRef.current = socket
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility)
-      unsubEvent()
-      unsubNotification()
-      unsubReconnect()
-      socket.disconnect()
-      socketRef.current = null
-    }
-  }, [walletAddress, handleEvent, handleNotification, queryClient])
+  })
 }

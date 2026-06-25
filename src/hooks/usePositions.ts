@@ -1,8 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchPositions } from '../api/positions';
-import type { Position } from '../api/types';
+import { usePositions as useSdkPositions } from '@dimes-dot-fi/sdk/react';
+import type { PositionStatus } from '@dimes-dot-fi/sdk';
 import { useAuthStore } from '../store/auth';
-import { wsTimestamps } from './usePositionSocket';
 
 interface UsePositionsParams {
   sortBy?: string;
@@ -12,47 +10,30 @@ interface UsePositionsParams {
   expand?: string[];
 }
 
-const FAST_POLL_MS = 5_000;
-const SLOW_POLL_MS = 15_000;
-const RECONCILIATION_WINDOW_MS = 12_000;
-
+/**
+ * Thin wrapper over the SDK's `usePositions`. The SDK hook now owns what this
+ * file used to hand-roll: wallet-scoped cache keys (`scope`), transient-status
+ * adaptive polling, and WebSocket reconciliation (paired with the reconcile
+ * mode of `usePositionStream`). We only translate the demo's param shape and
+ * gate on auth.
+ */
 export function usePositions(params?: UsePositionsParams) {
   const jwt = useAuthStore((s) => s.jwt);
-  // Scope the cache to the active wallet — otherwise switching wallets (e.g.
-  // Privy → MetaMask) keeps the same query key and serves the previous wallet's
-  // cached positions until a refetch.
   const walletAddress = useAuthStore((s) => s.walletAddress);
-  const expandKey = params?.expand?.join(',') ?? '';
 
-  return useQuery({
-    queryKey: [
-      'positions',
-      walletAddress?.toLowerCase() ?? null,
-      params?.sortBy,
-      params?.sortDirection,
-      params?.state,
-      params?.status,
-      expandKey,
-    ],
-    queryFn: () => fetchPositions(params),
-    enabled: !!jwt && !!walletAddress,
-    refetchInterval: (query) => {
-      const data = query.state.data as Position[] | undefined;
-      if (data?.some((p) => p.status === 'pending' || p.status === 'closing' || p.status === 'settling' || p.status === 'unwinding')) return FAST_POLL_MS;
-      return SLOW_POLL_MS;
+  return useSdkPositions(
+    {
+      sortBy: params?.sortBy as 'created_at' | 'closed_at' | undefined,
+      sortDirection: params?.sortDirection as 'asc' | 'desc' | undefined,
+      state: params?.state,
+      status: params?.status as PositionStatus | undefined,
+      expand: params?.expand,
     },
-    structuralSharing: (oldData, newData) => {
-      if (!oldData || !Array.isArray(oldData) || !Array.isArray(newData)) return newData as Position[];
-      const now = Date.now();
-      return (newData as Position[]).map((pollPos) => {
-        const wsTime = wsTimestamps.get(pollPos.id);
-        if (wsTime && now - wsTime < RECONCILIATION_WINDOW_MS) {
-          const oldPos = (oldData as Position[]).find((p) => p.id === pollPos.id);
-          return oldPos ?? pollPos;
-        }
-        if (wsTime) wsTimestamps.delete(pollPos.id);
-        return pollPos;
-      });
+    { enabled: !!jwt && !!walletAddress },
+    {
+      scope: walletAddress?.toLowerCase() ?? null,
+      adaptivePolling: true,
+      reconcile: true,
     },
-  });
+  );
 }
