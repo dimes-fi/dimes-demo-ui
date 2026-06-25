@@ -1,4 +1,5 @@
-import { apiFetch, apiFetchList, apiFetchListWithPagination } from './client';
+import type { MarketExpand } from '@dimes-dot-fi/sdk';
+import { getDimesClient } from './dimesClient';
 import type { Market } from './types';
 
 export type MarketSort = 'ticker_asc' | 'depth_desc' | 'discovered_at_desc';
@@ -21,17 +22,17 @@ export interface FetchMarketsResult {
 }
 
 export async function fetchMarkets(params?: FetchMarketsParams): Promise<FetchMarketsResult> {
-  const searchParams = new URLSearchParams();
-  if (params?.category) searchParams.set('category', params.category);
-  if (params?.status) searchParams.set('status', params.status);
-  if (params?.acceptingNewPositions !== undefined) searchParams.set('accepting_new_positions', String(params.acceptingNewPositions));
-  if (params?.limit) searchParams.set('limit', String(params.limit));
-  if (params?.startingAfter) searchParams.set('starting_after', params.startingAfter);
-  if (params?.endingBefore) searchParams.set('ending_before', params.endingBefore);
-  if (params?.expand) params.expand.forEach((e) => searchParams.append('expand', e));
-  searchParams.set('sort', params?.sort ?? 'depth_desc');
-  const qs = searchParams.toString();
-  return apiFetchListWithPagination<Market>(`/v1/prediction-markets/markets${qs ? `?${qs}` : ''}`);
+  const page = await getDimesClient().getMarkets({
+    category: params?.category,
+    status: params?.status,
+    acceptingNewPositions: params?.acceptingNewPositions,
+    sort: params?.sort ?? 'depth_desc',
+    limit: params?.limit,
+    startingAfter: params?.startingAfter,
+    endingBefore: params?.endingBefore,
+    expand: params?.expand as MarketExpand[] | undefined,
+  });
+  return { data: page.data, hasMore: page.hasMore, totalCount: page.totalCount };
 }
 
 export interface SearchMarketsParams {
@@ -43,16 +44,16 @@ export interface SearchMarketsParams {
 
 /** Search markets by title, ticker, or token ID */
 export async function searchMarkets(params: SearchMarketsParams): Promise<Market[]> {
-  const searchParams = new URLSearchParams({ query: params.query });
-  if (params.category) searchParams.set('category', params.category);
-  if (params.status) searchParams.set('status', params.status);
-  if (params.acceptingNewPositions !== undefined) {
-    searchParams.set('accepting_new_positions', String(params.acceptingNewPositions));
-  }
-  return apiFetchList<Market>(`/v1/prediction-markets/markets/search?${searchParams.toString()}`);
+  const page = await getDimesClient().searchMarkets({
+    query: params.query,
+    category: params.category,
+    status: params.status,
+    acceptingNewPositions: params.acceptingNewPositions,
+  });
+  return page.data;
 }
 
 /** Fetch a single market by ticker */
 export async function fetchMarket(ticker: string): Promise<Market> {
-  return apiFetch<Market>(`/v1/prediction-markets/markets/${encodeURIComponent(ticker)}`);
+  return getDimesClient().getMarket(ticker);
 }
