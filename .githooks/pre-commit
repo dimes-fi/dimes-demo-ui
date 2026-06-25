@@ -1,0 +1,23 @@
+#!/bin/sh
+# Block commits that stage a local-path dependency (e.g. link:../dimes-sdk).
+# Local links are allowed in the working tree for development, just never committed.
+staged=$(git diff --cached --name-only)
+
+# package.json: file:/link:/portal:/relative specs in any deps or override map.
+if printf '%s\n' "$staged" | grep -qx "package.json"; then
+  git show :package.json | node scripts/check-no-local-links.mjs --stdin || {
+    echo "pre-commit: refusing to commit a local-path dependency. Unstage package.json or restore the published version."
+    exit 1
+  }
+fi
+
+# pnpm-lock.yaml: pnpm records `link:`/`file:` here even when package.json stays clean.
+# Match only specs followed by a path (./ ../ or /) so `excludeLinksFromLockfile:` is ignored.
+if printf '%s\n' "$staged" | grep -qx "pnpm-lock.yaml"; then
+  if git show :pnpm-lock.yaml | grep -nE '(link|file|portal):\.{0,2}/' >/dev/null; then
+    echo "pre-commit: refusing to commit a local-path link recorded in pnpm-lock.yaml:"
+    git show :pnpm-lock.yaml | grep -nE '(link|file|portal):\.{0,2}/'
+    echo "Run 'pnpm unlink @dimes-dot-fi/sdk' (or restore the lockfile) before committing."
+    exit 1
+  fi
+fi
