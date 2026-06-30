@@ -492,6 +492,7 @@ export function PositionIdRow({
         cursor: 'pointer',
         transition: 'color 0.2s',
         userSelect: 'none',
+        whiteSpace: 'nowrap',
       }}
     >
       <span style={{ letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'var(--font)', fontSize: 10 }}>

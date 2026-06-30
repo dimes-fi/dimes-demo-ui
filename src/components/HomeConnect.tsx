@@ -5,6 +5,8 @@ import {
   walletBackend,
   selectBackend,
   consumeAutoConnect,
+  consumeDepositIntent,
+  switchToRainbowForWallet,
   type WalletBackend,
 } from '../runtimeConfig'
 import { primaryBtn, secondaryBtn } from './connectShared'
@@ -106,27 +108,19 @@ export function HomeConnect() {
 }
 
 function PrivyHome() {
-  const { login, connectWallet } = usePrivy()
-  const setWantsDepositWallet = useAuthStore((s) => s.setWantsDepositWallet)
+  const { login } = usePrivy()
 
   useEffect(() => {
     if (consumeAutoConnect()) login()
   }, [login])
 
+  // External wallets never ride the Privy stack — "Connect a wallet" and the
+  // deposit wallet switch to RainbowKit. Only "Connect with Privy" stays Privy.
   return (
     <HomeButtons
-      onConnectWallet={() => {
-        setWantsDepositWallet(false)
-        connectWallet()
-      }}
-      onConnectPrivy={() => {
-        setWantsDepositWallet(false)
-        login()
-      }}
-      onDepositWallet={() => {
-        setWantsDepositWallet(true)
-        connectWallet()
-      }}
+      onConnectWallet={() => switchToRainbowForWallet(false)}
+      onConnectPrivy={login}
+      onDepositWallet={() => switchToRainbowForWallet(true)}
       onConnectTurnkey={switchTo('turnkey')}
     />
   )
@@ -137,20 +131,49 @@ function RainbowHome() {
   return (
     <ConnectButton.Custom>
       {({ openConnectModal, mounted }) => (
-        <HomeButtons
-          primaryReady={mounted}
-          onConnectWallet={() => {
-            setWantsDepositWallet(false)
-            openConnectModal()
-          }}
-          onConnectPrivy={switchTo('privy')}
-          onDepositWallet={() => {
-            setWantsDepositWallet(true)
-            openConnectModal()
-          }}
-          onConnectTurnkey={switchTo('turnkey')}
+        <RainbowHomeButtons
+          openConnectModal={openConnectModal}
+          mounted={mounted}
+          setWantsDepositWallet={setWantsDepositWallet}
         />
       )}
     </ConnectButton.Custom>
+  )
+}
+
+// Split out so we can run an effect with the render-prop's openConnectModal:
+// after a switch to RainbowKit (from Privy/Turnkey) the picker auto-opens once
+// the modal is mounted, replaying the deposit intent that survived the reload.
+function RainbowHomeButtons({
+  openConnectModal,
+  mounted,
+  setWantsDepositWallet,
+}: {
+  openConnectModal: () => void
+  mounted: boolean
+  setWantsDepositWallet: (v: boolean) => void
+}) {
+  useEffect(() => {
+    if (!mounted) return
+    if (consumeAutoConnect()) {
+      setWantsDepositWallet(consumeDepositIntent())
+      openConnectModal()
+    }
+  }, [mounted, openConnectModal, setWantsDepositWallet])
+
+  return (
+    <HomeButtons
+      primaryReady={mounted}
+      onConnectWallet={() => {
+        setWantsDepositWallet(false)
+        openConnectModal()
+      }}
+      onConnectPrivy={switchTo('privy')}
+      onDepositWallet={() => {
+        setWantsDepositWallet(true)
+        openConnectModal()
+      }}
+      onConnectTurnkey={switchTo('turnkey')}
+    />
   )
 }

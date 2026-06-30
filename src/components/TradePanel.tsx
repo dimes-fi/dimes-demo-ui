@@ -110,6 +110,7 @@ export function TradePanel({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- derived reset on market/side change
     setLeverageBps(clampLeverageToMarket(DEFAULT_LEVERAGE_BPS, market, side))
     setShowTicker(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed on the granular market.leverage.* fields, not the whole `market` object, so unrelated market changes don't reset leverage
   }, [market.ticker, market.leverage.minBps, market.leverage.maxBps, market.leverage.maxYesBps, market.leverage.maxNoBps, market.leverage.stepBps, side])
   const [slippageBps, setSlippageBps] = useState(DEFAULT_SLIPPAGE_BPS)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -244,6 +245,7 @@ export function TradePanel({
     } else {
       toastedErrorRef.current = null
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires on error changes only; market.ticker/side/leverageBps/collateralUsd are read as latest-value snapshots for the toast context, not triggers
   }, [verifyError, createWriteError, createReceiptError, createReceiptErrorObj, clearOffer, addToast])
 
   const [isOfferExpired, setIsOfferExpired] = useState(false)
@@ -282,6 +284,7 @@ export function TradePanel({
       })
     }
     create(promotedOffer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per new promoted offer; addPendingStub/create/collateralUsd are read as latest values, not triggers (deps here would re-fire mid-flight)
   }, [promotedOffer])
 
   const updateCollateral = (next: string) => {
@@ -409,7 +412,7 @@ export function TradePanel({
         { allowPartialFill, minFillBps: adjustedMinFill },
       ))
     }
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires only when a new offerError arrives; all other reads are latest-value snapshots, not triggers
   }, [offerError])
 
   // Tween display values for whichever field is mid-correction. When the

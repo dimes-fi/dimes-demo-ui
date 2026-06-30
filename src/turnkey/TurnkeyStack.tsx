@@ -40,11 +40,15 @@ function TurnkeyBridge({ children }: { children: ReactNode }) {
   const addToast = useToastStore((s) => s.add)
 
   // The SDK recreates refreshWallets/createWallet/etc. on every render. Holding
-  // them in a ref (refreshed each render) keeps them OUT of the effect deps — in
-  // deps they churned the effect, tearing it down mid-await and stranding the
-  // provisioning guard, so it logged "refreshing" once then went silent forever.
+  // them in a ref (refreshed after each commit) keeps them OUT of the effect
+  // deps — in deps they churned the effect, tearing it down mid-await and
+  // stranding the provisioning guard, so it logged "refreshing" once then went
+  // silent forever. The provisioning effect reads fns.current at call time, so
+  // updating in an effect (not during render) is fine.
   const fns = useRef({ refreshWallets: tk.refreshWallets, createWallet: tk.createWallet, connectAsync, disconnect, addToast })
-  fns.current = { refreshWallets: tk.refreshWallets, createWallet: tk.createWallet, connectAsync, disconnect, addToast }
+  useEffect(() => {
+    fns.current = { refreshWallets: tk.refreshWallets, createWallet: tk.createWallet, connectAsync, disconnect, addToast }
+  })
 
   // One-shot per mount: provision a wallet at most once (reset on error so a
   // reload/retry can try again).
@@ -120,7 +124,7 @@ function TurnkeyBridge({ children }: { children: ReactNode }) {
       cancelled = true
     }
     // fns held in a ref on purpose; SDK callbacks aren't referentially stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [authState, httpClient, wallets, connectors, isConnected])
 
   return <>{children}</>

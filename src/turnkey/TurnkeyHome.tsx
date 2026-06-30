@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useTurnkey } from '@turnkey/react-wallet-kit'
-import { consumeAutoConnect, selectBackend } from '../runtimeConfig'
+import { consumeAutoConnect, selectBackend, switchToRainbowForWallet } from '../runtimeConfig'
 import { HomeButtons } from '../components/HomeConnect'
 
 // Lazy-loaded (see HomeConnect) so @turnkey/react-wallet-kit is only evaluated
@@ -16,9 +16,9 @@ export default function TurnkeyHome() {
 
   return (
     <HomeButtons
-      onConnectWallet={() => selectBackend('rainbowkit')}
+      onConnectWallet={() => switchToRainbowForWallet(false)}
       onConnectPrivy={() => selectBackend('privy')}
-      onDepositWallet={() => selectBackend('rainbowkit')}
+      onDepositWallet={() => switchToRainbowForWallet(true)}
       onConnectTurnkey={() => void handleLogin()}
     />
   )

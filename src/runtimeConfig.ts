@@ -42,6 +42,7 @@ const TK_ORG_KEY = 'dimes.turnkeyOrgId'
 const TK_PROXY_KEY = 'dimes.turnkeyAuthProxyConfigId'
 const BACKEND_KEY = 'dimes.walletBackend'
 const AUTOCONNECT_KEY = 'dimes.autoConnect'
+const DEPOSIT_INTENT_KEY = 'dimes.depositIntent'
 
 function ss(): Storage | null {
   try {
@@ -158,16 +159,15 @@ export function isBackendConfigured(b: WalletBackend): boolean {
  * Which wallet stack mounts. Privy and Turnkey each need their own provider
  * stack, so they can't co-mount — instead the home page is a selector that
  * persists a choice here and reloads into that stack (same reload pattern as
- * applySettings). Precedence: explicit user selection > Privy > RainbowKit.
- * Turnkey is never an auto-default — only an explicit selection mounts it.
+ * applySettings). Precedence: explicit user selection > RainbowKit.
+ * Privy and Turnkey are never auto-defaults — each only mounts when the user
+ * explicitly picks it (the home page's "Connect with Privy/Turnkey" switches).
+ * The plain "Connect wallet" button stays the RainbowKit wallet picker.
  * Fixed for the page's lifetime, so the choice never flips between renders.
  */
 export function walletBackend(): WalletBackend {
   const selected = ss()?.getItem(BACKEND_KEY) as WalletBackend | null
   if (selected && isBackendConfigured(selected)) return selected
-  if (getPrivyAppId()) return 'privy'
-  // Turnkey is never an auto-default — it's only reached by explicit selection
-  // (the home page's "Connect with Turnkey" switch).
   return 'rainbowkit'
 }
 
@@ -190,6 +190,31 @@ export function consumeAutoConnect(): boolean {
   const s = ss()
   if (s?.getItem(AUTOCONNECT_KEY) === '1') {
     s.removeItem(AUTOCONNECT_KEY)
+    return true
+  }
+  return false
+}
+
+/**
+ * "Connect a wallet" / deposit-wallet always run on RainbowKit, whatever stack
+ * is currently mounted — Privy and Turnkey are reached ONLY by their own
+ * explicit buttons. When another stack owns wagmi we can't open RainbowKit's
+ * modal in place, so switch to it and reload; the deposit intent has to survive
+ * that reload, so it rides sessionStorage and is consumed on the rainbow mount.
+ */
+export function switchToRainbowForWallet(deposit: boolean): void {
+  const s = ss()
+  if (!s) return
+  if (deposit) s.setItem(DEPOSIT_INTENT_KEY, '1')
+  else s.removeItem(DEPOSIT_INTENT_KEY)
+  selectBackend('rainbowkit')
+}
+
+/** Read-and-clear the deposit-wallet intent set by switchToRainbowForWallet. */
+export function consumeDepositIntent(): boolean {
+  const s = ss()
+  if (s?.getItem(DEPOSIT_INTENT_KEY) === '1') {
+    s.removeItem(DEPOSIT_INTENT_KEY)
     return true
   }
   return false

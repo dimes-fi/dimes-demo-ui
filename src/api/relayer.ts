@@ -188,7 +188,6 @@ export async function submitRelayerBatchDirect(
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const hmac = await signRelayerRequest(creds.apiSecret, `${timestamp}POST/submit${body}`);
 
-  // eslint-disable-next-line no-console -- temporary relayer 500 diagnosis
   console.log('[relayer] /submit payload', { apiKey: creds.apiKey, timestamp, payload });
 
   const response = await fetch(`${POLYMARKET_RELAYER_URL}/submit`, {
