@@ -1,4 +1,4 @@
-import type { PositionStatus } from '@dimes-dot-fi/sdk';
+import type { PositionPartialCloseList, PositionStatus } from '@dimes-dot-fi/sdk';
 import { getDimesClient } from './dimesClient';
 import type { ContractInfo, Position } from './types';
 
@@ -26,4 +26,8 @@ export async function cancelPosition(positionId: string): Promise<void> {
 
 export async function fetchContractInfo(): Promise<ContractInfo> {
   return getDimesClient().getContractInfo();
+}
+
+export async function fetchPartialCloses(positionId: string): Promise<PositionPartialCloseList> {
+  return getDimesClient().getPositionPartialCloses(positionId);
 }

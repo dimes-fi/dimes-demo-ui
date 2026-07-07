@@ -1,10 +1,11 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import type { PositionUnwindList } from '../api/types'
 
 interface ChartPoint {
   date: Date
   leverageBps: number
   isUnwindEvent: boolean
+  reasonDetail?: string | null
 }
 
 function buildChartPoints(unwindList: PositionUnwindList, endAt?: Date): {
@@ -35,6 +36,7 @@ function buildChartPoints(unwindList: PositionUnwindList, endAt?: Date): {
       date: new Date(unwind.executedAt),
       leverageBps: unwind.afterLeverageBps,
       isUnwindEvent: true,
+      reasonDetail: unwind.reasonDetail,
     })
   }
 
@@ -96,6 +98,13 @@ export function LeverageChart({
     ro.observe(node)
     setSvgWidth(node.getBoundingClientRect().width || 300)
   }, [])
+
+  useEffect(() => {
+    if (!tooltip) return
+    const dismiss = () => setTooltip(null)
+    window.addEventListener('scroll', dismiss, true)
+    return () => window.removeEventListener('scroll', dismiss, true)
+  }, [tooltip])
 
   if (isLoading || !unwinds) {
     return (
@@ -412,9 +421,43 @@ export function LeverageChart({
           >
             {formatDate(tooltip.point.date)}
             {tooltip.point.isUnwindEvent && (
-              <span style={{ color: 'var(--text-dim)', marginLeft: 4 }}>· unwind</span>
+              <span style={{ color: 'var(--text-dim)', marginLeft: 4 }}>· deleveraged</span>
             )}
           </div>
+          {tooltip.point.isUnwindEvent && tooltip.point.reasonDetail && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 5,
+                marginTop: 5,
+                paddingTop: 5,
+                borderTop: '1px solid rgba(255,255,255,0.1)',
+                maxWidth: 200,
+                whiteSpace: 'normal',
+              }}
+            >
+              <span
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: '50%',
+                  background: '#5B9CF5',
+                  flexShrink: 0,
+                  marginTop: 4,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 10,
+                  lineHeight: 1.35,
+                  color: '#9CC2F7',
+                  fontFamily: 'var(--font)',
+                }}
+              >
+                {tooltip.point.reasonDetail}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </>

@@ -12,8 +12,8 @@ importers:
   .:
     dependencies:
       '@dimes-dot-fi/sdk':
-        specifier: ^2.1.0
-        version: 2.1.0(@tanstack/react-query@5.100.9(react@19.2.6))(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@5.0.10)(viem@2.48.8(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
+        specifier: ^2.2.0
+        version: 2.2.0(@tanstack/react-query@5.100.9(react@19.2.6))(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@5.0.10)(viem@2.48.8(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
       '@privy-io/react-auth':
         specifier: ^3.32.1
         version: 3.32.1(@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@solana/sysvars@5.5.1(typescript@5.9.3))(@tanstack/query-core@5.100.9)(@tanstack/react-query@5.100.9(react@19.2.6))(@types/react@19.2.14)(bufferutil@4.1.0)(permissionless@0.3.6(viem@2.48.8(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.6))(utf-8-validate@5.0.10)(zod@4.4.3)
@@ -255,8 +255,8 @@ packages:
     resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
     engines: {node: '>=20.19.0'}
 
-  '@dimes-dot-fi/sdk@2.1.0':
-    resolution: {integrity: sha512-4qDZBZPwI0d0FXnccSPLfo+g9VS+zTMTUx7p/z/rkZDitI1S5Ctom1YjkU2YjUIlCriudeFYcu94vpwJB6cbjg==}
+  '@dimes-dot-fi/sdk@2.2.0':
+    resolution: {integrity: sha512-IJoh9AwBr6HMO0G1ylyXqximTiRKzK0cCdUvjzLSCXzrYlPOBhkzjNpxiTBwNtJoeAp+07PhrI3EJmVBUgqZEA==}
     peerDependencies:
       '@tanstack/react-query': '>=5'
       react: '>=19'
@@ -4567,7 +4567,7 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@dimes-dot-fi/sdk@2.1.0(@tanstack/react-query@5.100.9(react@19.2.6))(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@5.0.10)(viem@2.48.8(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))':
+  '@dimes-dot-fi/sdk@2.2.0(@tanstack/react-query@5.100.9(react@19.2.6))(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@5.0.10)(viem@2.48.8(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))':
     dependencies:
       humps: 2.0.1
       socket.io-client: 4.8.3(bufferutil@4.1.0)(utf-8-validate@5.0.10)

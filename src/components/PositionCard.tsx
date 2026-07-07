@@ -36,17 +36,12 @@ export function PositionCard({
   const partialFilledPct = partial ? Math.min(100, Math.max(0, partial.filledBps / 100)) : 0
   const showPartialFilling = isOpeningPosition && partial != null
 
-  // Detect a settled partial fill: the position opened smaller than requested
-  // while leverage was preserved (an unwind would have dropped leverage instead).
+  // "Opened at X% of requested" is the FROZEN initial fill from the API — it must not
+  // move when the position is later partially closed. Earlier this was derived from
+  // current/entry notional, so a partial close made it look like the fill shrank.
   const entryNotional = parseFloat(position.entry.notionalUsd)
-  const currentNotional = parseFloat(position.current.notionalUsd)
-  const leveragePreserved = position.current.bookLeverageBps >= position.entry.leverageBps * 0.99
-  const isPartialOpen =
-    position.status === 'open' &&
-    entryNotional > 0 &&
-    currentNotional < entryNotional * 0.995 &&
-    leveragePreserved
-  const fillRatioPct = entryNotional > 0 ? (currentNotional / entryNotional) * 100 : 100
+  const initialFillPct = position.entry.initialFillBps != null ? position.entry.initialFillBps / 100 : null
+  const isPartialOpen = position.status === 'open' && initialFillPct != null && initialFillPct < 99.5
 
 
   const isYes = position.side === 'yes'
@@ -375,11 +370,11 @@ export function PositionCard({
                 reducing
               </span>
             )}
-            {isPartialOpen && (() => {
-              const low = fillRatioPct < 75
+            {isPartialOpen && initialFillPct != null && (() => {
+              const low = initialFillPct < 75
               return (
                 <span
-                  title={`Opened at ${fillRatioPct.toFixed(0)}% of requested ($${entryNotional.toFixed(2)})`}
+                  title={`Opened at ${initialFillPct.toFixed(0)}% of requested ($${entryNotional.toFixed(2)})`}
                   style={{
                     fontSize: 11,
                     fontWeight: 600,
@@ -392,7 +387,32 @@ export function PositionCard({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {fillRatioPct.toFixed(0)}% fill
+                  {initialFillPct.toFixed(0)}% fill
+                </span>
+              )
+            })()}
+            {(() => {
+              // Partial-close indicator: how much of the original size has been sold.
+              // remainingBps legitimately decreases after each partial close.
+              const remainingBps = position.current.remainingBps
+              if (remainingBps == null || remainingBps >= 9950) return null
+              const closedPct = 100 - remainingBps / 100
+              return (
+                <span
+                  title={`${closedPct.toFixed(0)}% of the original position has been partially closed`}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: '#5B9CF5',
+                    background: 'rgba(91,156,245,0.1)',
+                    border: '1px solid rgba(91,156,245,0.25)',
+                    borderRadius: 0,
+                    padding: '2px 8px',
+                    textTransform: 'uppercase',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {closedPct.toFixed(0)}% closed
                 </span>
               )
             })()}

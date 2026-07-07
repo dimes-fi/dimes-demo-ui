@@ -8,11 +8,20 @@ import { HealthRing } from './components/HealthRing'
 import { LeverageSlider } from './components/LeverageSlider'
 import { MarketCard } from './components/MarketCard'
 import { PositionCard } from './components/PositionCard'
+import { LeverageChart } from './components/LeverageChart'
+import { PartialCloseChart } from './components/PartialCloseChart'
 import { SettledCard } from './components/SettledCard'
 import { QuoteDetails } from './components/QuoteDetails'
 import { TradePanel } from './components/TradePanel'
 import { usePartialOpenStore } from './store/partialOpen'
-import type { Market, Offer, OpenPosition, ClosedPosition } from './api/types'
+import type {
+  Market,
+  Offer,
+  OpenPosition,
+  ClosedPosition,
+  PositionUnwindList,
+  PositionPartialCloseList,
+} from './api/types'
 
 const mockPerNotional = {
   at100UsdBps: 100000,
@@ -291,6 +300,59 @@ const mockUnwindingPosition: OpenPosition = {
     positionValueUsd: '7.90',
     positionValueUsdPips: '79000',
   },
+}
+
+const mockUnwindList: PositionUnwindList = {
+  originationLeverageBps: 60000,
+  originatedAt: '2025-06-01T12:00:00.000Z',
+  currentLeverageBps: 20000,
+  hasMore: false,
+  data: [
+    { executedAt: '2025-06-02T14:30:00.000Z', beforeLeverageBps: 60000, afterLeverageBps: 40000, reason: 'spread_blowout', reasonDetail: 'The bid-ask spread widened sharply beyond its recent baseline, signalling thinning liquidity.' },
+    { executedAt: '2025-06-03T18:15:00.000Z', beforeLeverageBps: 40000, afterLeverageBps: 30000, reason: 'depth_decay', reasonDetail: 'Resting order-book depth fell well below its recent peak.' },
+    { executedAt: '2025-06-04T09:45:00.000Z', beforeLeverageBps: 30000, afterLeverageBps: 20000, reason: 'price_drop_severe', reasonDetail: "The position's side fell sharply against the position." },
+  ],
+}
+
+const mockPartialCloseList: PositionPartialCloseList = {
+  hasMore: false,
+  data: [
+    {
+      executedAt: '2026-03-20T10:05:00.000Z',
+      soldTokenUnits: '100000000',
+      averageSalePriceUsd: '0.36',
+      averageSalePriceUsdPips: '3600',
+      saleProceedsUsd: '36.00',
+      saleProceedsUsdPips: '360000',
+      capitalRepaidUsd: '20.00',
+      capitalRepaidUsdPips: '200000',
+      userPayoutUsd: '16.00',
+      userPayoutUsdPips: '160000',
+      remainingPositionTokenUnits: '251515151',
+      newLeverageBps: 38000,
+    },
+    {
+      executedAt: '2026-03-20T10:08:00.000Z',
+      soldTokenUnits: '100000000',
+      averageSalePriceUsd: '0.40',
+      averageSalePriceUsdPips: '4000',
+      saleProceedsUsd: '40.00',
+      saleProceedsUsdPips: '400000',
+      capitalRepaidUsd: '18.00',
+      capitalRepaidUsdPips: '180000',
+      userPayoutUsd: '22.00',
+      userPayoutUsdPips: '220000',
+      remainingPositionTokenUnits: '151515151',
+      newLeverageBps: 30000,
+    },
+  ],
+}
+
+const mockPartiallyClosedPosition: OpenPosition = {
+  ...mockOpenPosition,
+  id: 'dm_pos_partial_closed',
+  entry: { ...mockOpenPosition.entry, positionTokenUnits: '351515151' },
+  current: { ...mockOpenPosition.current, remainingBps: 4310 },
 }
 
 const mockVoidedPosition: OpenPosition = {
@@ -626,6 +688,30 @@ export default function Preview() {
         <h2 style={{ fontSize: 14, fontWeight: 600, color: '#e8e8e8', marginBottom: 12 }}>Unwinding Position</h2>
         <div style={{ maxWidth: 480, marginBottom: 40 }}>
           <PositionCard position={mockUnwindingPosition} />
+        </div>
+
+        {/* Leverage History (with unwind reasons) */}
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: '#EEFF00', marginBottom: 12 }}>Leverage History — unwind reasons</h2>
+        <p style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>Hover an unwind dot to see the risk signal that triggered the deleverage.</p>
+        <div style={{ maxWidth: 480, marginBottom: 40 }} data-testid="leverage-history-preview">
+          <LeverageChart unwinds={mockUnwindList} isLoading={false} endAt={new Date('2025-06-05T12:00:00.000Z')} />
+        </div>
+
+        {/* Partially Closed Position */}
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: '#5B9CF5', marginBottom: 12 }}>Partially Closed Position</h2>
+        <div style={{ maxWidth: 480, marginBottom: 20 }}>
+          <PositionCard position={mockPartiallyClosedPosition} />
+        </div>
+        <p style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>Hover a step to see the slice sold, sale price, and payout.</p>
+        <div style={{ maxWidth: 480, marginBottom: 40 }} data-testid="partial-close-history-preview">
+          <PartialCloseChart
+            partialCloses={mockPartialCloseList}
+            originalTokenUnits={mockPartiallyClosedPosition.entry.positionTokenUnits}
+            currentTokenUnits={mockPartiallyClosedPosition.current.positionTokenUnits}
+            openedAt={mockPartiallyClosedPosition.entry.openedAt}
+            isLoading={false}
+            endAt={new Date('2026-03-20T10:35:00.000Z')}
+          />
         </div>
 
         {/* Voided Position */}

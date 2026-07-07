@@ -11,8 +11,10 @@ import { useRequestClose, useRequestPartialClose } from '../contract/hooks'
 import { useRequestClosePushFunded, useRequestPartialClosePushFunded } from '../contract/pushFundedHooks'
 import { useRequestCloseSmart, useRequestPartialCloseSmart } from '../contract/smartWalletHooks'
 import { PartialCloseSlider } from './PartialCloseSlider'
+import { PartialCloseChart } from './PartialCloseChart'
 import { useCancelPosition } from '../hooks/useCancelPosition'
 import { useContractInfo } from '../hooks/useContractInfo'
+import { usePartialCloses } from '../hooks/usePartialCloses'
 import { useAuthStore } from '../store/auth'
 import { formatSlippageBps } from '../utils/format'
 import { ErrorBanner } from './ErrorBanner'
@@ -496,23 +498,34 @@ function OpenPositionDetail({
 
         <StatGroup label="Position Size">
           {(() => {
+            // Frozen initial fill from the API — how much of the requested size opened.
+            // Does not move on partial close (that's tracked by "Remaining" below).
             const reqNotional = parseFloat(position.entry.notionalUsd)
-            const curNotional = parseFloat(position.current.notionalUsd)
-            const leveragePreserved =
-              position.current.bookLeverageBps >= position.entry.leverageBps * 0.99
-            const isPartialOpen =
-              reqNotional > 0 && curNotional < reqNotional * 0.995 && leveragePreserved
-            if (!isPartialOpen) return null
-            const pct = (curNotional / reqNotional) * 100
+            const initialFillPct =
+              position.entry.initialFillBps != null ? position.entry.initialFillBps / 100 : null
+            if (initialFillPct == null || initialFillPct >= 99.5) return null
+            const openNotional = reqNotional * (initialFillPct / 100)
             return (
               <>
                 <StatRow label="Requested Notional" value={`$${reqNotional.toFixed(2)}`} />
                 <StatRow
-                  label="Filled"
-                  value={`${pct.toFixed(0)}% ($${curNotional.toFixed(2)})`}
+                  label="Filled at open"
+                  value={`${initialFillPct.toFixed(0)}% ($${openNotional.toFixed(2)})`}
                   valueColor="var(--yellow)"
                 />
               </>
+            )
+          })()}
+          {(() => {
+            // Remaining size after any partial closes — expected to fall below 100%
+            // and is not a fill problem.
+            const remainingBps = position.current.remainingBps
+            if (remainingBps == null || remainingBps >= 9950) return null
+            return (
+              <StatRow
+                label="Remaining after partial closes"
+                value={`${(remainingBps / 100).toFixed(0)}% of original`}
+              />
             )
           })()}
           <StatRow
@@ -530,6 +543,8 @@ function OpenPositionDetail({
             />
           )}
         </StatGroup>
+
+        <PartialCloseHistorySection position={position} />
 
         <StatGroup label="PnL & Fees">
           <StatRow
@@ -1013,5 +1028,20 @@ function ClosedPositionDetail({
         </StatGroup>
       </div>
     </div>
+  )
+}
+
+function PartialCloseHistorySection({ position }: { position: OpenPosition }) {
+  const { data, isLoading } = usePartialCloses(position.id)
+  if (!isLoading && (data?.data.length ?? 0) === 0) return null
+
+  return (
+    <PartialCloseChart
+      partialCloses={data}
+      originalTokenUnits={position.entry.positionTokenUnits}
+      currentTokenUnits={position.current.positionTokenUnits}
+      openedAt={position.entry.openedAt}
+      isLoading={isLoading}
+    />
   )
 }

@@ -165,6 +165,37 @@ export function PartialCloseSlider({
           max {formatTokens(maxTokenUnits)}
         </span>
       </div>
+
+      {/* Limit explainer: the floor is 20% of the ORIGINAL position (or 5 tokens),
+          so after an earlier partial close it reads as a larger % of what's left. */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 6,
+          marginTop: 10,
+          padding: '8px 10px',
+          borderRadius: 8,
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        <span aria-hidden style={{ color: 'var(--text-dim)', fontSize: 11, lineHeight: '15px' }}>
+          ⓘ
+        </span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 10.5, lineHeight: '15px' }}>
+          Minimum close is <strong style={{ color: 'var(--text)' }}>20% of your original position</strong> (or 5
+          tokens, whichever is larger) — that&apos;s{' '}
+          <strong style={{ color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+            {formatTokens(minTokenUnits)} tokens
+          </strong>
+          , about{' '}
+          <strong style={{ color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+            {formatPctBps(minPctBps)}%
+          </strong>{' '}
+          of what you hold now.
+        </span>
+      </div>
     </div>
   )
 }
