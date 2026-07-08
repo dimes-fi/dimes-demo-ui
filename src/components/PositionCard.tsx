@@ -1,5 +1,6 @@
-import { useState } from 'react'
 import { MicroStat } from './CardViewParts'
+import { CopyableTitle } from './CopyableTitle'
+import { useCopyFlash } from '../hooks/useCopyFlash'
 import type { OpenPosition } from '../api/types'
 import { usePartialOpenStore } from '../store/partialOpen'
 import { CardShell } from './CardShell'
@@ -13,14 +14,8 @@ export function PositionCard({
   onClick?: () => void
   isSelected?: boolean
 }) {
-  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const { isCopied, copy } = useCopyFlash()
   const displayTitle = position.marketTitle || position.marketTicker
-
-  const copyToClipboard = (value: string, key: string) => {
-    navigator.clipboard.writeText(value)
-    setCopiedKey(key)
-    setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500)
-  }
 
   const isClosingPosition = position.status === 'closing'
   const isSettlingPosition = position.status === 'settling'
@@ -271,45 +266,21 @@ export function PositionCard({
             alignItems: 'flex-start',
             gap: 12,
             marginBottom: 16,
+            flexWrap: 'wrap',
           }}
         >
-          <div style={{ minWidth: 0, flex: '1 1 auto' }}>
-            <div
-              onClick={(e) => {
-                e.stopPropagation()
-                copyToClipboard(position.marketTicker, 'marketTicker')
-              }}
-              style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: copiedKey === 'marketTicker' ? 'var(--green)' : '#ffffff',
-                overflow: 'hidden',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                textOverflow: 'ellipsis',
-                cursor: 'pointer',
-                transition: 'color 0.2s',
-                lineHeight: 1.3,
-              }}
-              title={
-                copiedKey === 'marketTicker'
-                  ? 'Ticker copied'
-                  : `${displayTitle} — click to copy ticker`
-              }
-            >
-              {copiedKey === 'marketTicker' ? '✓ Ticker copied' : displayTitle}
-            </div>
+          <div style={{ minWidth: 150, flex: '1 1 150px' }}>
+            <CopyableTitle text={displayTitle} copyValue={position.marketTicker} />
             <PositionIdRow
               positionId={position.id}
-              copied={copiedKey === 'positionId'}
+              copied={isCopied('positionId')}
               onCopy={(e) => {
                 e.stopPropagation()
-                copyToClipboard(position.id, 'positionId')
+                copy(position.id, 'positionId')
               }}
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <span
               style={{
                 fontSize: 11,
@@ -515,26 +486,24 @@ export function PositionIdRow({
         whiteSpace: 'nowrap',
       }}
     >
-      <span style={{ letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'var(--font)', fontSize: 10 }}>
-        {copied ? '✓ Copied' : 'ID'}
+      <span style={{ letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'var(--font)', fontSize: 10, fontWeight: 700 }}>
+        ID
       </span>
       <span>{truncateId(positionId)}</span>
-      {!copied && (
-        <svg
-          width="11"
-          height="11"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ opacity: 0.6 }}
-        >
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
-      )}
+      <svg
+        width="11"
+        height="11"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ opacity: 0.6 }}
+      >
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>
     </div>
   )
 }

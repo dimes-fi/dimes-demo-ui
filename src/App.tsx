@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { Drawer } from 'vaul'
 import { useAccount } from 'wagmi'
 import { useAutoAuth } from './hooks/useAutoAuth'
 import { useErrorContext } from './hooks/useErrorContext'
@@ -6,9 +7,12 @@ import { useResolveDepositWallet } from './hooks/useResolveDepositWallet'
 import { usePositionSocket } from './hooks/usePositionSocket'
 import { useMarketSocket } from './hooks/useMarketSocket'
 import { useSeedLiveMarkets } from './hooks/useSeedLiveMarkets'
+import { usePositions } from './hooks/usePositions'
+import { useIsMobile } from './hooks/useMediaQuery'
 import { useAuthStore } from './store/auth'
-import type { Market } from './api/types'
+import { isOpenPosition, type Market } from './api/types'
 import { Layout } from './components/Layout'
+import { BottomNav, type MobileTab } from './components/BottomNav'
 import { ToastContainer } from './components/ToastContainer'
 import { DebugPanel } from './components/DebugPanel'
 import { installGlobalErrorCapture } from './utils/errorLog'
@@ -61,11 +65,31 @@ function App() {
   // pre-connect Hero stays up while markets (gated on the JWT) render below.
   const isConnected = wagmiConnected || smartWalletAddress != null
   const hasApiKey = Boolean(getApiKey())
+  const isMobile = useIsMobile()
+  const [mobileTab, setMobileTab] = useState<MobileTab>('markets')
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   const [marketCount, setMarketCount] = useState<number | undefined>(undefined)
   const onTotalCount = useCallback((n: number | undefined) => setMarketCount(n), [])
 
+  // Open-position count drives the bottom-nav badge. Params match PositionList's
+  // active query so React Query serves both from one cache entry (no extra
+  // fetch). Only meaningful once authenticated.
+  const { data: activePositions } = usePositions({
+    sortBy: 'created_at',
+    sortDirection: 'desc',
+    state: 'active',
+    expand: ['unwinds'],
+  })
+  const openCount = activePositions?.filter(isOpenPosition).length
+
   const drawerOpen = selectedMarket !== null
+
+  // Keep the last-selected market mounted through the sheet's close animation
+  // (vaul slides the content out after `open` flips false, so unmounting it
+  // immediately would flash an empty sheet).
+  const [lastMarket, setLastMarket] = useState<Market | null>(null)
+  if (selectedMarket && selectedMarket !== lastMarket) setLastMarket(selectedMarket)
+  const drawerMarket = selectedMarket ?? lastMarket
 
   useEffect(() => {
     if (drawerOpen) {
@@ -76,13 +100,19 @@ function App() {
     return () => { document.body.style.overflow = '' }
   }, [drawerOpen])
 
+  // On mobile the connected view is a two-tab shell (Markets / Positions); on
+  // desktop both sections stack as before. `showMarkets`/`showPositions` gate
+  // which section renders — desktop shows both regardless of the active tab.
+  const showMarkets = !isMobile || mobileTab === 'markets'
+  const showPositions = !isMobile || mobileTab === 'positions'
+
   return (
     <Layout>
       <ToastContainer />
       <DebugPanel />
       {hasApiKey && isConnected && <Header />}
 
-      <main style={{ padding: '24px 0' }}>
+      <main className="app-shell">
         {/* Gate on the API key first: a returning user can have a persisted
             wallet but no key (sessionStorage is cleared on tab close), so the
             key must come before connect — otherwise reconnect mints against no
@@ -107,33 +137,62 @@ function App() {
 
         {hasApiKey && isConnected && jwt && (
           <>
-            <div>
-              <MarketsTitle count={marketCount} />
-              <MarketList
-                onSelectMarket={setSelectedMarket}
-                selectedMarketId={selectedMarket?.id}
-                onTotalCount={onTotalCount}
-              />
-            </div>
-
-            {/* Trade drawer — overlays from right, no layout shift */}
-            <div
-              className={`trade-drawer-backdrop${drawerOpen ? ' trade-drawer-backdrop--open' : ''}`}
-              onClick={() => setSelectedMarket(null)}
-            />
-            <div className={`trade-drawer${drawerOpen ? ' trade-drawer--open' : ''}`}>
-              <div className="trade-drawer__inner dimes-scroll">
-                {selectedMarket && (
-                  <TradePanel
-                    market={selectedMarket}
-                    onClose={() => setSelectedMarket(null)}
-                  />
-                )}
+            {showMarkets && (
+              <div>
+                <MarketsTitle count={marketCount} />
+                <MarketList
+                  onSelectMarket={setSelectedMarket}
+                  selectedMarketId={selectedMarket?.id}
+                  onTotalCount={onTotalCount}
+                />
               </div>
-            </div>
+            )}
 
-            {isConnected && (
-              <div style={{ marginTop: 40 }}>
+            {/* Trade drawer — vaul bottom sheet on mobile (drag-to-dismiss,
+                scroll-lock and animation handled by the lib); the CSS right-side
+                panel on desktop. */}
+            {isMobile ? (
+              <Drawer.Root
+                open={drawerOpen}
+                onOpenChange={(open) => { if (!open) setSelectedMarket(null) }}
+              >
+                <Drawer.Portal>
+                  <Drawer.Overlay className="vaul-overlay" />
+                  <Drawer.Content className="vaul-drawer" aria-describedby={undefined}>
+                    <Drawer.Handle className="vaul-handle" />
+                    <Drawer.Title className="sr-only">Trade</Drawer.Title>
+                    <div className="trade-drawer__inner dimes-scroll">
+                      {drawerMarket && (
+                        <TradePanel
+                          market={drawerMarket}
+                          onClose={() => setSelectedMarket(null)}
+                        />
+                      )}
+                    </div>
+                  </Drawer.Content>
+                </Drawer.Portal>
+              </Drawer.Root>
+            ) : (
+              <>
+                <div
+                  className={`trade-drawer-backdrop${drawerOpen ? ' trade-drawer-backdrop--open' : ''}`}
+                  onClick={() => setSelectedMarket(null)}
+                />
+                <div className={`trade-drawer${drawerOpen ? ' trade-drawer--open' : ''}`}>
+                  <div className="trade-drawer__inner dimes-scroll">
+                    {drawerMarket && (
+                      <TradePanel
+                        market={drawerMarket}
+                        onClose={() => setSelectedMarket(null)}
+                      />
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {showPositions && (
+              <div style={{ marginTop: isMobile ? 0 : 40 }}>
                 <h2 style={sectionTitle}>Your positions</h2>
                 <PositionList />
               </div>
@@ -141,6 +200,10 @@ function App() {
           </>
         )}
       </main>
+
+      {hasApiKey && isConnected && jwt && (
+        <BottomNav active={mobileTab} onChange={setMobileTab} positionCount={openCount} />
+      )}
     </Layout>
   )
 }

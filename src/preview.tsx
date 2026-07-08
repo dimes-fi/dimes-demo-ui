@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Layout } from './components/Layout'
 import { LiveMarketsStrip } from './components/LiveMarketsStrip'
-import { MarketRow } from './components/MarketList'
+import { MarketRow, MarketCardMobile } from './components/MarketList'
+import { BottomNav, type MobileTab } from './components/BottomNav'
 import { useLiveMarketsStore } from './store/liveMarkets'
 import { CardShell } from './components/CardShell'
 import { HealthRing } from './components/HealthRing'
@@ -608,18 +609,47 @@ function FillingDemo() {
   )
 }
 
+/**
+ * Mobile-shell showcase — the market cards and bottom tab bar that replace the
+ * desktop table + right drawer below 768px. The bottom nav is CSS-gated to
+ * mobile widths, so this section only fully renders on a phone-sized viewport.
+ */
+function MobileShellDemo() {
+  const [tab, setTab] = useState<MobileTab>('markets')
+  const [selectedId, setSelectedId] = useState<string | undefined>(mockMarket2.id)
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <h2 style={{ fontSize: 14, fontWeight: 600, color: '#EEFF00', marginBottom: 4 }}>
+        Mobile shell — market cards & bottom nav
+      </h2>
+      <p style={{ color: '#555', fontSize: 12, marginBottom: 12 }}>
+        Resize to ≤768px (or use a phone viewport) to see the tab bar dock to the
+        bottom. Tap a card to select it.
+      </p>
+      <div className="mkt-cards" style={{ marginBottom: 16 }}>
+        <MarketCardMobile market={mockMarket} onSelect={(m) => setSelectedId(m.id)} isSelected={selectedId === mockMarket.id} />
+        <MarketCardMobile market={mockMarket2} onSelect={(m) => setSelectedId(m.id)} isSelected={selectedId === mockMarket2.id} />
+        <MarketCardMobile market={mockMarket3} onSelect={(m) => setSelectedId(m.id)} isSelected={selectedId === mockMarket3.id} />
+      </div>
+      <BottomNav active={tab} onChange={setTab} positionCount={2} />
+    </div>
+  )
+}
+
 export default function Preview() {
   const [leverageBps, setLeverageBps] = useState(30000)
 
   return (
     <Layout>
-      <div style={{ padding: '20px 0' }}>
+      <div className="app-shell" style={{ padding: '20px 0' }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: '#EEFF00', marginBottom: 8 }}>
           DIMES UI Preview
         </h1>
         <p style={{ color: '#555', fontSize: 12, marginBottom: 32 }}>
           Component showcase with mock data
         </p>
+
+        <MobileShellDemo />
 
         {/* Live Markets Strip + animations */}
         <h2 style={{ fontSize: 14, fontWeight: 600, color: '#e8e8e8', marginBottom: 12 }}>Live Markets Strip & table flash</h2>

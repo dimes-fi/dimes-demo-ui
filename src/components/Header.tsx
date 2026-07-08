@@ -6,6 +6,7 @@ import { useWalletKind } from '../contract/useWalletKind'
 import { useDepositWallet } from '../contract/useDepositWallet'
 import { useMintSandboxUsdc } from '../contract/hooks'
 import { ConnectControls } from './ConnectControls'
+import { useIsMobile } from '../hooks/useMediaQuery'
 import { useToastStore } from '../store/toasts'
 import { formatContractError } from '../contract/error-messages'
 import {
@@ -51,9 +52,13 @@ function UsdcBalance() {
   return (
     <span
       style={{
-        padding: '8px 12px',
-        fontSize: 'var(--fs-sm)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        whiteSpace: 'nowrap',
+        padding: '6px 12px',
+        fontSize: 12,
         fontWeight: 600,
+        lineHeight: 1.2,
         color: 'var(--text)',
         background: 'var(--surface-subtle)',
         border: '1px solid rgba(255,255,255,0.1)',
@@ -228,8 +233,11 @@ function MintUsdcButton() {
       disabled={busy}
       title="Mint test sUSDC to your wallet (sandbox only)"
       style={{
-        padding: '8px 12px',
-        fontSize: 'var(--fs-sm)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        whiteSpace: 'nowrap',
+        padding: '6px 12px',
+        fontSize: 12,
         fontWeight: isEmpty ? 700 : 600,
         borderRadius: 0,
         border: `1px solid ${isEmpty ? 'var(--yellow-border)' : 'var(--border)'}`,
@@ -487,22 +495,63 @@ function SettingsControl() {
   )
 }
 
-function DimesLogo() {
+function DimesLogo({ height = 36 }: { height?: number }) {
   return (
     <img
       src="/logo-dark.png"
       alt="Dimes"
-      style={{ height: 36, width: 'auto', display: 'block', marginLeft: -6 }}
+      style={{ height, width: 'auto', display: 'block', marginLeft: -6 }}
     />
   )
 }
 
 export function Header() {
   const { isConnected } = useAccount()
+  const isMobile = useIsMobile()
   // Until an API key is set there's no environment/balance to act on, so hide
   // the settings, faucet and balance controls. (Key changes force a reload, so
   // reading it at render stays coherent.)
   const hasApiKey = Boolean(getApiKey())
+
+  // Mobile: keep the top bar to logo + connect, and move the status controls
+  // (wallet badge, faucet, balance) into a horizontally scrollable chip strip
+  // below it so nothing wraps into a cramped grid. Settings stays in the top
+  // row so its dropdown isn't clipped by the strip's overflow.
+  if (isMobile) {
+    return (
+      <header
+        className="header-row"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'stretch',
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <DimesLogo height={28} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {hasApiKey && <SettingsControl />}
+            <CompactConnectButton />
+          </div>
+        </div>
+        {isConnected && hasApiKey && (
+          <div className="mobile-chip-strip">
+            <WalletKindBadge />
+            {isSandbox() && <MintUsdcButton />}
+            <UsdcBalance />
+          </div>
+        )}
+      </header>
+    )
+  }
 
   return (
     <header

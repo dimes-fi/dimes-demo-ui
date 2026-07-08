@@ -85,9 +85,17 @@ export function isMintableCollateral(): boolean {
   return getUsdcAddress().toLowerCase() === ENVIRONMENTS.sandbox.usdcAddress.toLowerCase()
 }
 
-/** API base URL for the resolved environment. */
+/**
+ * API base URL for the resolved environment.
+ *
+ * An explicit VITE_API_URL *defines* the sandbox base (e.g. the AWS sandbox at
+ * api-sandbox-aws.dimes.fi), so it must win even when the environment is pinned
+ * to "sandbox" in sessionStorage — otherwise clicking Sandbox in Settings (or
+ * entering an API key) would snap the base back to the hardcoded GCP sandbox.
+ * The prod path stays hardcoded: toggling to prod always means api.dimes.fi.
+ */
 export function getApiBase(): string {
-  if (hasEnvOverride()) return ENVIRONMENTS[getEnvironment()].apiUrl
+  if (getEnvironment() === 'prod') return ENVIRONMENTS.prod.apiUrl
   return (import.meta.env.VITE_API_URL as string | undefined) || ENVIRONMENTS.sandbox.apiUrl
 }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useMarkets } from '../hooks/useMarkets'
+import { useIsMobile } from '../hooks/useMediaQuery'
 import { useFlashOnChange } from '../hooks/useFlashOnChange'
 import type { Market } from '../api/types'
 import {
@@ -48,6 +49,7 @@ export function MarketList({
   selectedMarketId?: string
   onTotalCount?: (count: number | undefined) => void
 }) {
+  const isMobile = useIsMobile()
   const [search, setSearch] = useState(() => getQueryParam('q') ?? '')
   const [debouncedSearch, setDebouncedSearch] = useState(() => getQueryParam('q') ?? '')
   const [category, setCategoryState] = useState<string | undefined>(() => getQueryParam('category'))
@@ -241,6 +243,18 @@ export function MarketList({
         </div>
       ) : (
         <>
+          {isMobile ? (
+            <div className="mkt-cards">
+              {markets!.map((market) => (
+                <MarketCardMobile
+                  key={market.id}
+                  market={market}
+                  onSelect={onSelectMarket}
+                  isSelected={market.id === selectedMarketId}
+                />
+              ))}
+            </div>
+          ) : (
           <div className="markets-table-wrap">
             <table
               style={{
@@ -293,6 +307,7 @@ export function MarketList({
               </tbody>
             </table>
           </div>
+          )}
 
           {/* Pagination */}
           <div
@@ -461,6 +476,72 @@ export function MarketRow({
         </button>
       </td>
     </tr>
+  )
+}
+
+/**
+ * Mobile equivalent of MarketRow — a full-width tappable card. Same data (title,
+ * status, category, both side pills) restacked for a narrow, one-thumb layout;
+ * the whole card is the tap target that opens the trade sheet.
+ */
+export function MarketCardMobile({
+  market,
+  onSelect,
+  isSelected,
+}: {
+  market: Market
+  onSelect: (market: Market) => void
+  isSelected: boolean
+}) {
+  const maxLevYes = (leverageMaxBps(market.leverage, 'yes') / 10000).toFixed(2)
+  const maxLevNo = (leverageMaxBps(market.leverage, 'no') / 10000).toFixed(2)
+  const eligibility = getSidedEligibility(market)
+  const statusTitle = STATUS_DESCRIPTIONS[market.status] || market.status
+  const active = market.status === 'active'
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(market)}
+      className={`mkt-card${isSelected ? ' mkt-card--selected' : ''}`}
+    >
+      <span className="mkt-card__title">{market.title || market.ticker || '—'}</span>
+      <span className="mkt-card__meta">
+        <span
+          title={statusTitle}
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            color: active ? 'var(--green)' : 'var(--text-muted)',
+            background: active ? 'var(--green-soft)' : 'var(--border)',
+            border: `1px solid ${active ? 'rgba(68,255,151,0.2)' : 'var(--border)'}`,
+            padding: '2px 8px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {market.status}
+        </span>
+        {market.category && (
+          <span
+            style={{
+              fontSize: 10,
+              color: 'var(--text-muted)',
+              background: 'var(--surface-subtle)',
+              padding: '2px 8px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {formatCategory(market.category)}
+          </span>
+        )}
+        <span className="mkt-card__sides">
+          <SidePill side="yes" eligibility={eligibility.yes} maxLevX={maxLevYes} />
+          <SidePill side="no" eligibility={eligibility.no} maxLevX={maxLevNo} />
+        </span>
+      </span>
+    </button>
   )
 }
 

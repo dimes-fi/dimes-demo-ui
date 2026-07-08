@@ -146,10 +146,9 @@ export function ToastContainer() {
         }
       `}</style>
       <div
+        className="toast-stack"
         style={{
           position: 'fixed',
-          bottom: 24,
-          right: 24,
           zIndex: 9999,
           display: 'flex',
           flexDirection: 'column-reverse',

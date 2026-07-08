@@ -27,7 +27,7 @@ import { maxViableLeverageBps } from '../utils/capacity'
 import { CapacityGuide } from './CapacityGuide'
 import { CardShell } from './CardShell'
 import { ErrorBanner } from './ErrorBanner'
-import { formatApiError } from '../api/error-messages'
+import { formatApiError, formatErrorMessage } from '../api/error-messages'
 import { formatContractError } from '../contract/error-messages'
 import { useToastStore } from '../store/toasts'
 import { LeverageSlider } from './LeverageSlider'
@@ -40,6 +40,8 @@ import { Button } from './ui/Button'
 import { Field } from './ui/Field'
 import { Input } from './ui/Input'
 import { PositionIdRow } from './PositionCard'
+import { CopyableTitle } from './CopyableTitle'
+import { useCopyFlash } from '../hooks/useCopyFlash'
 
 function formatCreateError(error: unknown): string {
   if (error != null && typeof error === 'object' && 'status' in error && 'code' in error) {
@@ -88,8 +90,7 @@ export function TradePanel({
   const [leverageBps, setLeverageBps] = useState(() =>
     clampLeverageToMarket(DEFAULT_LEVERAGE_BPS, market, side),
   )
-  const [showTicker, setShowTicker] = useState(false)
-  const [marketIdCopied, setMarketIdCopied] = useState(false)
+  const { isCopied, copy } = useCopyFlash()
 
   const sideMaxBps = leverageMaxBps(market.leverage, side)
   const capacityViableLev = useMemo(() => maxViableLeverageBps(market, side), [market, side])
@@ -109,7 +110,6 @@ export function TradePanel({
     // Reset leverage/header when the market or side changes underneath us.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- derived reset on market/side change
     setLeverageBps(clampLeverageToMarket(DEFAULT_LEVERAGE_BPS, market, side))
-    setShowTicker(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed on the granular market.leverage.* fields, not the whole `market` object, so unrelated market changes don't reset leverage
   }, [market.ticker, market.leverage.minBps, market.leverage.maxBps, market.leverage.maxYesBps, market.leverage.maxNoBps, market.leverage.stepBps, side])
   const [slippageBps, setSlippageBps] = useState(DEFAULT_SLIPPAGE_BPS)
@@ -327,12 +327,20 @@ export function TradePanel({
     { leverageBps },
   )
 
-  const adjustment = hintAdjustment(offerHint, {
+  const rawAdjustment = hintAdjustment(offerHint, {
     collateralUsd: Number(collateralUsd) || 0,
     leverageBps,
     slippageBps,
     minFillBps,
   })
+  // The SDK maps quote_slippage_too_high to a slippage "adjustment", but this
+  // API's params mean the opposite of what that mapping assumes: currentSlippageBps
+  // is the slippage the order would incur and maxSlippageBps is the tolerance the
+  // user already sent. There is no safe single-field bump (the real fix is reduce
+  // size or raise tolerance well past the presets), and auto-correcting here would
+  // silently swallow the error — a draft-time failure has no draft to re-promote,
+  // so isAutoCorrecting would stick and hide the hint. Surface the hint instead.
+  const adjustment = offerHint?.kind === 'raise-slippage' ? null : rawAdjustment
 
   // Auto-correct inputs the moment a quote error returns a constraint hint.
   // The user still presses Get Quote again to retry — we never silently
@@ -366,7 +374,6 @@ export function TradePanel({
     }
 
     hasAutoRetriedRef.current = true
-    setIsAutoCorrecting(true)
 
     let adjustedCollateral = Number(collateralUsd) || 0
     let adjustedLeverage = leverageBps
@@ -401,6 +408,10 @@ export function TradePanel({
 
     const errorDraft = tradeState.phase === 'error' ? tradeState.draft : undefined
     if (errorDraft) {
+      // A promote-time failure carries the draft — re-promote it with the
+      // corrected params. Suppress the inline error only while that async
+      // retry is in flight; success flips isAutoCorrecting back off.
+      setIsAutoCorrecting(true)
       correctAndPromote(errorDraft, withPartialFill(
         buildQuoteParams({
           marketTicker: market.ticker,
@@ -411,9 +422,44 @@ export function TradePanel({
         }),
         { allowPartialFill, minFillBps: adjustedMinFill },
       ))
+    } else {
+      // A draft-time failure has no draft to re-promote. Nothing async runs, so
+      // don't linger in the silent auto-correcting state — that would hide the
+      // corrected-input hint (and any error) indefinitely. The user retries.
+      setIsAutoCorrecting(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires only when a new offerError arrives; all other reads are latest-value snapshots, not triggers
   }, [offerError])
+
+  // Guaranteed fallback: any quote error we don't explain with a rich inline
+  // treatment (a structured hint or a partial-fill message) gets surfaced as a
+  // toast carrying the error code — so an unhandled or edge code is never
+  // silently swallowed. Errors that trigger a silent auto-correct retry
+  // self-heal, so we skip those. Deduped on the error object.
+  const offerErrorToastedRef = useRef<unknown>(null)
+  useEffect(() => {
+    if (!offerError || isAutoCorrecting) {
+      if (!offerError) offerErrorToastedRef.current = null
+      return
+    }
+    // Richly handled inline — don't double-surface as a toast.
+    if (offerHint != null || partialFillError != null) return
+    if (offerErrorToastedRef.current === offerError) return
+    offerErrorToastedRef.current = offerError
+
+    const code = apiErr?.code
+    addToast({
+      title: 'Could not get a quote',
+      description: code
+        ? formatErrorMessage(code, apiErr?.params ?? null)
+        : formatApiError(offerError),
+      variant: 'error',
+      durationMs: 6000,
+      error: offerError,
+      context: { action: 'getQuote', code, market: market.ticker, side, leverageBps, collateralUsd },
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires on a new offerError / correcting-state change; market/side/etc. are latest-value snapshots for the toast context, not triggers
+  }, [offerError, isAutoCorrecting, offerHint, partialFillError])
 
   // Tween display values for whichever field is mid-correction. When the
   // tween isn't active for a given field, we fall back to the live state.
@@ -470,9 +516,15 @@ export function TradePanel({
     acceptChanges(tradeState.newDraft, tradeState.retryCount)
   }
 
-  const headlineText = showTicker
-    ? market.ticker
-    : market.title || market.ticker
+  // When a quote lands, the drawer grows with the quote details + Create button
+  // below the fold — especially on the mobile bottom sheet. Scroll the drawer to
+  // reveal the action once the draft is ready.
+  const bottomRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (tradeState.phase === 'draft-ready') {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
+  }, [tradeState.phase])
 
   const formatCents = (usd: string) => {
     const p = Number(usd)
@@ -502,34 +554,17 @@ export function TradePanel({
           }}
         >
           <div style={{ minWidth: 0, flex: '1 1 auto' }}>
-            <div
-              onClick={() => setShowTicker((s) => !s)}
-              title={showTicker ? 'Click for title' : 'Click for ticker'}
-              style={{
-                cursor: 'pointer',
-                fontSize: 14,
-                fontWeight: 600,
-                color: '#ffffff',
-                lineHeight: 1.3,
-                overflow: 'hidden',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                textOverflow: 'ellipsis',
-                fontFamily: showTicker ? 'monospace' : 'var(--font)',
-              }}
-            >
-              {headlineText}
-            </div>
+            <CopyableTitle
+              text={market.title || market.ticker}
+              copyValue={market.ticker}
+            />
             <PositionIdRow
               positionId={market.id}
-              copied={marketIdCopied}
+              copied={isCopied('marketId')}
               entityLabel="Market ID"
               onCopy={(e) => {
                 e.stopPropagation()
-                navigator.clipboard.writeText(market.id)
-                setMarketIdCopied(true)
-                setTimeout(() => setMarketIdCopied(false), 1500)
+                copy(market.id, 'marketId')
               }}
             />
           </div>
@@ -918,6 +953,7 @@ export function TradePanel({
 
         </>)}
 
+        <div ref={bottomRef} aria-hidden />
       </div>
     </CardShell>
   )

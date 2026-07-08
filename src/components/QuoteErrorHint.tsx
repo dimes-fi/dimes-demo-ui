@@ -60,6 +60,12 @@ export function QuoteErrorHint({ hint, adjustment, market, side, leverageBps }: 
       case 'clamp-leverage':
         text = 'Leverage is too high for the current price — try a lower value.'
         break
+      case 'raise-slippage': {
+        const needed = (hint.currentSlippageBps / 100).toFixed(1).replace(/\.0$/, '')
+        const limit = (hint.maxSlippageBps / 100).toFixed(1).replace(/\.0$/, '')
+        text = `This order would move the price ${needed}%, above your ${limit}% slippage tolerance. Reduce your size, or raise slippage above ${needed}%.`
+        break
+      }
       default:
         return null
     }

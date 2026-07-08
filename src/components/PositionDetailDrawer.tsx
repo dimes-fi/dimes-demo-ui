@@ -10,6 +10,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useRequestClose, useRequestPartialClose } from '../contract/hooks'
 import { useRequestClosePushFunded, useRequestPartialClosePushFunded } from '../contract/pushFundedHooks'
 import { useRequestCloseSmart, useRequestPartialCloseSmart } from '../contract/smartWalletHooks'
+import { CopyableTitle } from './CopyableTitle'
 import { PartialCloseSlider } from './PartialCloseSlider'
 import { PartialCloseChart } from './PartialCloseChart'
 import { useCancelPosition } from '../hooks/useCancelPosition'
@@ -22,6 +23,7 @@ import { StatRow } from './StatRow'
 import { StatGroup, PnlHero } from './CardViewParts'
 import { LeverageChart } from './LeverageChart'
 import { PositionIdRow } from './PositionCard'
+import { useCopyFlash } from '../hooks/useCopyFlash'
 
 export function PositionDetailDrawer({
   position,
@@ -88,12 +90,7 @@ function DrawerHeader({
   onClose: () => void
   badges: React.ReactNode
 }) {
-  const [copiedKey, setCopiedKey] = useState<string | null>(null)
-  const copy = (value: string, key: string) => {
-    navigator.clipboard.writeText(value)
-    setCopiedKey(key)
-    setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500)
-  }
+  const { isCopied, copy } = useCopyFlash()
   return (
     <div style={{ padding: '20px 24px 0' }}>
       <div
@@ -106,33 +103,11 @@ function DrawerHeader({
         }}
       >
         <div style={{ minWidth: 0, flex: '1 1 auto' }}>
-          <div
-            onClick={() => copy(marketTicker, 'ticker')}
-            title={
-              copiedKey === 'ticker'
-                ? 'Ticker copied'
-                : `${title} — click to copy ticker`
-            }
-            style={{
-              fontSize: 15,
-              fontWeight: 600,
-              color: copiedKey === 'ticker' ? 'var(--green)' : '#ffffff',
-              lineHeight: 1.3,
-              overflow: 'hidden',
-              display: '-webkit-box',
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: 'vertical',
-              textOverflow: 'ellipsis',
-              cursor: 'pointer',
-              transition: 'color 0.2s',
-            }}
-          >
-            {copiedKey === 'ticker' ? '✓ Ticker copied' : title}
-          </div>
+          <CopyableTitle text={title} copyValue={marketTicker} fontSize={15} lineClamp={3} />
           {positionId && (
             <PositionIdRow
               positionId={positionId}
-              copied={copiedKey === 'positionId'}
+              copied={isCopied('positionId')}
               onCopy={(e) => {
                 e.stopPropagation()
                 copy(positionId, 'positionId')
