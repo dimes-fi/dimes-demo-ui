@@ -83,8 +83,14 @@ export function TradePanel({
   onClose: () => void
 }) {
   const eligibility = useMemo(() => getSidedEligibility(market), [market])
-  const initialSide = defaultSide(eligibility) ?? 'yes'
-  const [side, setSide] = useState<'yes' | 'no'>(initialSide)
+  // A side is only tradeable if it accepts new positions AND has viable
+  // leverage capacity — a side with no leverage would render a dead slider.
+  // Prefer such a side on open so we never default into a side you can't use.
+  const sideTradeable = (s: 'yes' | 'no') =>
+    eligibility[s].open && maxViableLeverageBps(market, s) != null
+  const [side, setSide] = useState<'yes' | 'no'>(() =>
+    sideTradeable('yes') ? 'yes' : sideTradeable('no') ? 'no' : defaultSide(eligibility) ?? 'yes',
+  )
   const sideEligibility = eligibility[side]
   const [collateralUsd, setCollateralUsd] = useState('')
   const [leverageBps, setLeverageBps] = useState(() =>
@@ -202,10 +208,20 @@ export function TradePanel({
 
   const canGetQuote = isConnected && collateralUsd && Number(collateralUsd) > 0
 
+  // Fire exactly once per success transition. `createSuccess` stays true until
+  // the mutation is reset (which doesn't happen on the success path), and
+  // `onClose` gets a new identity on every parent render — without this latch
+  // the effect re-invalidates positions on every re-render, spamming /positions.
+  const didInvalidateRef = useRef(false)
   useEffect(() => {
     if (createSuccess) {
-      queryClient.invalidateQueries({ queryKey: ['dimes', 'positions'] })
-      onClose()
+      if (!didInvalidateRef.current) {
+        didInvalidateRef.current = true
+        queryClient.invalidateQueries({ queryKey: ['dimes', 'positions'] })
+        onClose()
+      }
+    } else {
+      didInvalidateRef.current = false
     }
   }, [createSuccess, queryClient, onClose])
 
@@ -614,11 +630,12 @@ export function TradePanel({
           />
         </div>
 
-        {!sideEligibility.open ? (
+        {(!sideEligibility.open || capacityViableLev == null) ? (
           <SideUnavailablePanel
             side={side}
             reasonCode={sideEligibility.reasonCode}
-            otherOpen={eligibility[side === 'yes' ? 'no' : 'yes'].open}
+            noLeverage={sideEligibility.open && capacityViableLev == null}
+            otherOpen={sideTradeable(side === 'yes' ? 'no' : 'yes')}
             otherSub={
               market.prices
                 ? formatCents(side === 'yes' ? market.prices.noBidPriceUsd : market.prices.yesBidPriceUsd)
@@ -962,23 +979,19 @@ export function TradePanel({
 function SideUnavailablePanel({
   side,
   reasonCode,
+  noLeverage,
   otherOpen,
   otherSub,
   onSwitch,
 }: {
   side: 'yes' | 'no'
   reasonCode: string | null
+  noLeverage?: boolean
   otherOpen: boolean
   otherSub: string | null
   onSwitch: () => void
 }) {
   const otherLabel = side === 'yes' ? 'NO' : 'YES'
-  // The other side carries its own market accent (YES green, NO red) so the
-  // switch CTA reads as "go here next", not as a warning.
-  const otherIsYes = otherLabel === 'YES'
-  const otherAccent = otherIsYes ? 'var(--green)' : 'var(--red)'
-  const otherAccentSoft = otherIsYes ? 'var(--green-soft)' : 'var(--red-soft)'
-  const otherAccentBorder = otherIsYes ? 'var(--green-border)' : 'var(--red-border)'
 
   return (
     <div
@@ -1027,7 +1040,7 @@ function SideUnavailablePanel({
             {side.toUpperCase()} unavailable
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', lineHeight: 1.4 }}>
-            {rejectionReasonText(reasonCode)}
+            {noLeverage ? 'No leverage capacity on this side right now.' : rejectionReasonText(reasonCode)}
           </div>
         </div>
       </div>
@@ -1044,10 +1057,12 @@ function SideUnavailablePanel({
             justifyContent: 'space-between',
             gap: 8,
             padding: '10px 14px',
-            background: otherAccentSoft,
-            border: `1px solid ${otherAccentBorder}`,
+            // Neutral CTA — reads as "go here next", never as an error state
+            // (a red-tinted button for "Switch to NO" looked broken).
+            background: 'var(--surface-subtle)',
+            border: '1px solid var(--border-strong)',
             borderRadius: 'var(--radius)',
-            color: otherAccent,
+            color: 'var(--text)',
             fontFamily: 'var(--font)',
             fontSize: 13,
             fontWeight: 600,

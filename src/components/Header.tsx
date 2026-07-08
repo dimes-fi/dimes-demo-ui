@@ -444,7 +444,7 @@ function SettingsControl() {
               zIndex: 50,
               width: 320,
               padding: 16,
-              background: 'var(--surface)',
+              background: 'var(--card-elevated)',
               border: '1px solid var(--border)',
               borderRadius: 0,
               boxShadow: '0 8px 32px rgba(0,0,0,0.5)',

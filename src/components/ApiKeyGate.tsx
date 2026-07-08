@@ -34,7 +34,7 @@ export function ApiKeyGate({ title = 'Connect your API key' }: { title?: string 
           gap: 12px;
           padding: 20px;
           text-align: left;
-          background: var(--surface);
+          background: var(--card-elevated);
           border: 1px solid var(--border);
           border-top: 2px solid var(--yellow);
           box-shadow: 0 12px 40px rgba(0,0,0,0.45);
