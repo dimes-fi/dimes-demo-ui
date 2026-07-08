@@ -20,6 +20,8 @@ export type {
   PositionResult,
   PositionTiming,
   PositionFailure,
+  PositionPartialClose,
+  PositionPartialCloseList,
   ContractInfo,
   CreateOfferParams,
   SideEligibility,

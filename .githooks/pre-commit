@@ -22,12 +22,9 @@ if printf '%s\n' "$staged" | grep -qx "pnpm-lock.yaml"; then
   fi
 fi
 
-# Lint staged JS/TS files. Only added/copied/modified (ACM) files are checked so
-# renames/deletes don't fail on a missing path.
-lint_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|jsx|ts|tsx|mjs|cjs)$')
-if [ -n "$lint_files" ]; then
-  echo "$lint_files" | xargs npx eslint || {
-    echo "pre-commit: eslint found problems. Fix them or run 'git commit --no-verify' to bypass."
-    exit 1
-  }
-fi
+# Run eslint (staged files) + tsc (whole project) via lint-staged, which shows
+# per-task progress. Config lives in lint-staged.config.js.
+npx lint-staged || {
+  echo "pre-commit: lint-staged found problems. Fix them or run 'git commit --no-verify' to bypass."
+  exit 1
+}
