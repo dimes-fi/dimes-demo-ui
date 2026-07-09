@@ -5,14 +5,15 @@
   "description": "Reference React + Vite frontend for the Dimes leveraged prediction markets API.",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://github.com/dimes-demo/dimes-demo-ui#readme",
+  "homepage": "https://github.com/dimes-fi/dimes-demo-ui#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dimes-demo/dimes-demo-ui.git"
+    "url": "git+https://github.com/dimes-fi/dimes-demo-ui.git"
   },
   "bugs": {
-    "url": "https://github.com/dimes-demo/dimes-demo-ui/issues"
+    "url": "https://github.com/dimes-fi/dimes-demo-ui/issues"
   },
+  "packageManager": "pnpm@10.33.3",
   "keywords": [
     "dimes",
     "prediction-markets",
@@ -33,7 +34,7 @@
     "check:deps": "node scripts/check-no-local-links.mjs",
     "preview": "vite preview",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
-    "deploy": "VITE_API_KEY= VITE_API_URL= VITE_USDC_ADDRESS= VITE_RPC_URL= VITE_BUILDER_API_KEY= VITE_BUILDER_API_SECRET= VITE_BUILDER_API_PASSPHRASE= VITE_PRIVY_APP_ID=cmqo7752z005n0clbroq16xtd VITE_TURNKEY_ORG_ID=4b29e501-af84-450d-865f-b812f5018916 VITE_TURNKEY_AUTH_PROXY_CONFIG_ID=0eb10794-c978-4272-95c6-6be877060cb7 npm run build && firebase deploy --only hosting:demo"
+    "deploy": "VITE_API_KEY= VITE_API_URL= VITE_USDC_ADDRESS= VITE_RPC_URL= VITE_BUILDER_API_KEY= VITE_BUILDER_API_SECRET= VITE_BUILDER_API_PASSPHRASE= VITE_PRIVY_APP_ID=cmqo7752z005n0clbroq16xtd VITE_TURNKEY_ORG_ID=4b29e501-af84-450d-865f-b812f5018916 VITE_TURNKEY_AUTH_PROXY_CONFIG_ID=0eb10794-c978-4272-95c6-6be877060cb7 pnpm build && firebase deploy --only hosting:demo"
   },
   "dependencies": {
     "@dimes-dot-fi/sdk": "^2.2.0",

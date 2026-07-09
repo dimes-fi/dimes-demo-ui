@@ -24,7 +24,7 @@ fi
 
 # Run eslint (staged files) + tsc (whole project) via lint-staged, which shows
 # per-task progress. Config lives in lint-staged.config.js.
-npx lint-staged || {
+pnpm exec lint-staged || {
   echo "pre-commit: lint-staged found problems. Fix them or run 'git commit --no-verify' to bypass."
   exit 1
 }

@@ -36,8 +36,8 @@ See `src/hooks/useTradeMachine.ts` for the state machine and
 
 ```sh
 cp .env.example .env.local
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Open <http://localhost:5173>. By default, the demo talks to
@@ -138,7 +138,7 @@ manual "Use Deposit Wallet" toggle with automatic routing.
 2. Set it and run:
 
    ```bash
-   VITE_PRIVY_APP_ID=cmxxxxxxxxxxxxxxxxxxxxxxxx npm run dev
+   VITE_PRIVY_APP_ID=cmxxxxxxxxxxxxxxxxxxxxxxxx pnpm dev
    # or add VITE_PRIVY_APP_ID=… to .env.local
    ```
 
@@ -189,7 +189,7 @@ Proxy and pick auth methods — email OTP, passkey, OAuth — first).
 ```bash
 VITE_TURNKEY_ORG_ID=<org-uuid> \
 VITE_TURNKEY_AUTH_PROXY_CONFIG_ID=<config-uuid> \
-npm run dev
+pnpm dev
 # or add both to .env.local
 ```
 
@@ -261,12 +261,13 @@ The vault address and signer public key are fetched at runtime from
 
 ## Scripts
 
-| Command           | What it does                          |
-|-------------------|---------------------------------------|
-| `npm run dev`     | Start the Vite dev server.            |
-| `npm run build`   | Type-check and build for production.  |
-| `npm run lint`    | Run ESLint.                           |
-| `npm run preview` | Preview the production build locally. |
+| Command         | What it does                          |
+|-----------------|---------------------------------------|
+| `pnpm dev`      | Start the Vite dev server.            |
+| `pnpm build`    | Type-check and build for production.  |
+| `pnpm lint`     | Run ESLint.                           |
+| `pnpm test`     | Run the Vitest suite.                 |
+| `pnpm preview`  | Preview the production build locally. |
 
 ## License
 
