@@ -603,6 +603,20 @@ function OpenPositionDetail({
               valueColor={isVoided ? '#A78BFA' : '#F5A623'}
             />
           )}
+          {position.timing.settlementState === 'awaiting_resolution' && (
+            <StatRow
+              label="Settlement"
+              value="Waiting on venue result"
+              valueColor="#F5A623"
+            />
+          )}
+          {position.timing.settlementState === 'unresolved_upstream' && (
+            <StatRow
+              label="Settlement"
+              value="Venue dropped this market"
+              valueColor="#F5A623"
+            />
+          )}
         </StatGroup>
 
         {canAct && !confirming && (

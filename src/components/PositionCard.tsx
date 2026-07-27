@@ -22,6 +22,9 @@ export function PositionCard({
   const isPendingPosition = position.status === 'pending'
   const isUnwindingPosition = position.status === 'unwinding'
   const isVoided = position.timing.isVoided && position.timing.isSettlementPending
+  // The market has closed and the outcome is decided, but the venue has not published the
+  // result on chain yet, so there is nothing to redeem and the position stays open.
+  const isAwaitingResolution = position.timing.settlementState === 'awaiting_resolution'
   const isInFlight = isPendingPosition || isClosingPosition || isSettlingPosition || isUnwindingPosition
   const isOpeningPosition = isInFlight && !isClosingPosition && !isSettlingPosition && !isUnwindingPosition
   const deferredClose = position.closeAttempt
@@ -321,7 +324,7 @@ export function PositionCard({
                 textTransform: 'uppercase',
               }}
             >
-              {isVoided ? 'voided' : position.status === 'pending' ? 'created' : position.status}
+              {isVoided ? 'voided' : isAwaitingResolution ? 'awaiting result' : position.status === 'pending' ? 'created' : position.status}
             </span>
             {position.pendingOperation?.type === 'partial_close' && (
               <span

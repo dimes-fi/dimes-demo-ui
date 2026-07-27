@@ -237,6 +237,7 @@ const mockOpenPosition: OpenPosition = {
     timeToCloseMinutes: 138240,
     isVoided: false,
     isSettlementPending: false,
+    settlementState: 'none',
   },
 }
 
@@ -375,6 +376,7 @@ const mockVoidedPosition: OpenPosition = {
     timeToCloseMinutes: undefined,
     isVoided: true,
     isSettlementPending: true,
+    settlementState: 'voided',
   },
 }
 
