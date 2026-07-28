@@ -43,6 +43,7 @@ const mockMarket: Market = {
   yesSubTitle: undefined,
   category: 'crypto',
   status: 'active',
+  settlementState: 'none',
   provider: 'polymarket',
   polymarket: {
     conditionId: '0xcondition',
@@ -234,6 +235,7 @@ const mockOpenPosition: OpenPosition = {
   timing: {
     marketCloseTime: '2026-06-30T00:00:00Z',
     marketStatus: 'active',
+    settlementState: 'none',
     timeToCloseMinutes: 138240,
     isVoided: false,
     isSettlementPending: false,

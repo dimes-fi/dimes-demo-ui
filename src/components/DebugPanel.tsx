@@ -1,8 +1,12 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { requestSampleEvents } from '../api/sampleEvents'
+import { useAuthStore } from '../store/auth'
 import {
   clearErrorLog,
+  extractStack,
   formatErrorEntry,
   getErrorLog,
+  logError,
   subscribeErrorLog,
   type ErrorLogEntry,
 } from '../utils/errorLog'
@@ -19,7 +23,10 @@ const levelColor: Record<ErrorLogEntry['level'], string> = {
 export function DebugPanel() {
   const [open, setOpen] = useState(false)
   const [copiedTs, setCopiedTs] = useState<number | null>(null)
+  const [sampleEventsStatus, setSampleEventsStatus] = useState<string | null>(null)
+  const [sampleEventsPending, setSampleEventsPending] = useState(false)
   const entries = useErrorLog()
+  const jwt = useAuthStore((s) => s.jwt)
 
   // Discreet keyboard shortcut: Ctrl/Cmd + Shift + D
   useEffect(() => {
@@ -37,6 +44,26 @@ export function DebugPanel() {
     void navigator.clipboard?.writeText(formatErrorEntry(e))
     setCopiedTs(e.ts)
     setTimeout(() => setCopiedTs(null), 1500)
+  }
+
+  const sendSampleEvents = async () => {
+    setSampleEventsPending(true)
+    setSampleEventsStatus(null)
+    try {
+      const result = await requestSampleEvents()
+      setSampleEventsStatus(`${result.eventCount} events incoming, one every ${result.intervalMs}ms`)
+    } catch (error) {
+      logError({
+        level: 'error',
+        title: 'Sample events request failed',
+        detail: error instanceof Error ? error.message : String(error),
+        stack: extractStack(error),
+        source: 'toast',
+      })
+      setSampleEventsStatus('Request failed — see the entry below.')
+    } finally {
+      setSampleEventsPending(false)
+    }
   }
 
   return (
@@ -114,6 +141,39 @@ export function DebugPanel() {
                 ✕
               </button>
             </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              borderBottom: '1px solid var(--border-strong)',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => void sendSampleEvents()}
+              disabled={!jwt || sampleEventsPending}
+              title={
+                jwt
+                  ? 'Push one mock event of every WebSocket type onto this session'
+                  : 'Sign in first — sample events are delivered to your own connection'
+              }
+              style={{ ...btnStyle, opacity: !jwt || sampleEventsPending ? 0.4 : 1, flexShrink: 0 }}
+            >
+              {sampleEventsPending ? 'Sending…' : 'Send sample events'}
+            </button>
+            <span
+              style={{
+                fontSize: 11,
+                color: 'var(--text-dim)',
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {sampleEventsStatus ?? 'Replays every position + notification event with mock data.'}
+            </span>
           </div>
 
           <div className="dimes-scroll" style={{ overflowY: 'auto', padding: 8 }}>

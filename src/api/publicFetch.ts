@@ -1,10 +1,10 @@
 import { DimesApiError } from '@dimes-dot-fi/sdk';
 import { camelizeKeys } from '../utils/format';
 
-// Minimal unauthenticated fetch helper for the two Api-Key endpoints the SDK
-// does not cover: token minting (POST /tokens) and relayer submission. Every
-// JWT-authenticated call goes through the SDK's DimesClient instead — see
-// `dimesClient.ts`. The caller supplies the `Authorization: Api-Key ...` header.
+// Minimal fetch helper for the endpoints the SDK does not cover: token minting
+// (POST /tokens), relayer submission, and the sample-event test harness. Every
+// other call goes through the SDK's DimesClient instead — see `dimesClient.ts`.
+// The caller supplies its own `Authorization` header (Api-Key or Bearer).
 
 interface ApiErrorBody {
   error?: {

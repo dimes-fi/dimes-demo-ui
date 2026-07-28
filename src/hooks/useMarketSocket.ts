@@ -47,6 +47,8 @@ export function useMarketSocket() {
       // Deltas: the SDK already merged them into the table cache. Here we patch
       // the live store too, so a discovered-but-not-accepting market appears in
       // the strip the moment it starts accepting, and toast that transition.
+      // Eligibility, max-leverage and settlement-stage changes all arrive this
+      // way; the last one only ever changes fields the cards read from state.
       const deltas = event.data as MarketDelta[]
       const liveStore = useLiveMarketsStore.getState()
       const wasAccepting = new Map(liveStore.markets.map((m) => [m.id, !!m.acceptingNewPositions]))

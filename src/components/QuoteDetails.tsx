@@ -154,7 +154,7 @@ export function QuoteDetails({
         </>
       )}
       <StatRow
-        label={offer.provider === 'kalshi' ? 'Kalshi Fee' : 'Polymarket Fee'}
+        label="Polymarket Fee"
         value={`$${offer.expectedOpenTradingFeeUsd}`}
         previousValue={prev ? `$${prev.expectedOpenTradingFeeUsd}` : undefined}
       />

@@ -121,7 +121,7 @@ export function TradeEstimate({
         value={`${(estimate.originationFeeBps / 100).toFixed(2)}% (${usd(estimate.originationFeeUsdcUnits)})`}
       />
       <StatRow
-        label={market.provider === 'kalshi' ? 'Est. Kalshi Fee' : 'Est. Polymarket Fee'}
+        label="Est. Polymarket Fee"
         value={usd(estimate.tradingFeeUsdcUnits)}
       />
 

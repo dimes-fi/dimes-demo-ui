@@ -1,5 +1,6 @@
 import { usePositionStream } from '@dimes-dot-fi/sdk/react'
 import type { NotificationEvent, PositionEvent } from '@dimes-dot-fi/sdk/ws'
+import { isOpenPosition } from '../api/types'
 import type { Position } from '../api/types'
 import { useAuthStore } from '../store/auth'
 import { usePendingPositionsStore } from '../store/pendingPositions'
@@ -35,7 +36,10 @@ export function usePositionSocket() {
         removePending(position.onChainPositionKey)
       }
       const ticker = position.marketTitle ?? position.marketTicker
-      addToast(toastForPositionEvent(event.type, ticker))
+      // `timing` only exists on the open variant of the Position union — a closed
+      // position carries `result` instead, so narrow before reading it.
+      const settlementState = isOpenPosition(position) ? position.timing?.settlementState : undefined
+      addToast(toastForPositionEvent(event.type, ticker, settlementState))
     },
     onNotification: (event: NotificationEvent) => {
       const { code, message, params } = event.data
@@ -78,6 +82,30 @@ export function usePositionSocket() {
         return
       }
 
+      // The order could not be filled at all. The server message explains why.
+      if (code === 'ORDER_FULFILLMENT_FAILED') {
+        addToast({
+          title: 'Order failed',
+          description: message,
+          variant: 'error',
+          durationMs: 8000,
+        })
+        return
+      }
+
+      // Transient: the fill is being attempted again, nothing for the user to do.
+      if (code === 'ORDER_FULFILLMENT_RETRYING') {
+        addToast({
+          title: 'Retrying order',
+          description: message,
+          variant: 'warning',
+          durationMs: 5000,
+        })
+        return
+      }
+
+      // Unknown code — the server message is written for end users, so show it
+      // rather than dropping the notification.
       addToast({
         title: message,
         variant: 'info',
