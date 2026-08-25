@@ -25,6 +25,27 @@ export const erc20Abi = [
     outputs: [{ name: '', type: 'uint256' }],
   },
   {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'symbol',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'string' }],
+  },
+  {
+    name: 'decimals',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint8' }],
+  },
+  {
     // Sandbox-only faucet — the mock "Sandbox USDC" token has an unguarded
     // mint(to, amount). Absent on the production collateral token.
     name: 'mint',

@@ -17,7 +17,7 @@ interface ApiErrorBody {
 
 async function throwFromResponse(response: Response): Promise<never> {
   const rawBody = await response.text();
-  let parsed: ApiErrorBody | null = null;
+  let parsed: ApiErrorBody | null;
   try {
     parsed = rawBody ? (JSON.parse(rawBody) as ApiErrorBody) : null;
   } catch {

@@ -1,10 +1,11 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { usePrivy, useFundWallet, useExportWallet } from '@privy-io/react-auth'
-import { useAccount, useBalance, useChainId, useDisconnect, useSwitchChain } from 'wagmi'
+import { useAccount, useChainId, useDisconnect, useSwitchChain } from 'wagmi'
+import { useUsdcBalance } from '../hooks/useUsdcBalance'
 import { polygon } from 'wagmi/chains'
 import { formatUnits } from 'viem'
-import { getUsdcAddress, walletBackend } from '../runtimeConfig'
+import { walletBackend } from '../runtimeConfig'
 import { useDisplayWallet } from '../hooks/useDisplayWallet'
 import { useAuthStore } from '../store/auth'
 import { btnStyle, shorten, type MenuAction } from './connectShared'
@@ -205,8 +206,6 @@ function PrivyControls({ compact }: { compact: boolean }) {
   )
 }
 
-const USDC_ADDRESS = getUsdcAddress()
-
 /**
  * Account pill (our styling) that opens a small dropdown: full address + copy,
  * USDC balance, then backend-specific actions (fund / export / disconnect).
@@ -233,11 +232,7 @@ export function AccountMenuShell({
   const balanceAddress = (smartWalletAddress ??
     (depositWalletMode ? depositWalletAddress : null) ??
     address) as `0x${string}` | undefined
-  const { data: balance } = useBalance({
-    address: balanceAddress,
-    token: USDC_ADDRESS,
-    query: { enabled: !!balanceAddress && !!USDC_ADDRESS },
-  })
+  const { data: balance } = useUsdcBalance(balanceAddress)
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)

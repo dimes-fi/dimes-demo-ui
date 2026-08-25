@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useAccount, useBalance } from 'wagmi'
+import { useAccount } from 'wagmi'
+import { useUsdcBalance } from '../hooks/useUsdcBalance'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { useWalletKind } from '../contract/useWalletKind'
@@ -15,15 +16,12 @@ import {
   detectEnvFromKey,
   getApiKey,
   getEnvironment,
-  getUsdcAddress,
   isSandbox,
 } from '../runtimeConfig'
 
 function CompactConnectButton() {
   return <ConnectControls compact />
 }
-
-const USDC_ADDRESS = getUsdcAddress()
 
 function UsdcBalance() {
   const { address: eoa } = useAccount()
@@ -35,11 +33,7 @@ function UsdcBalance() {
   const address = (smartWalletAddress ??
     (depositWalletMode ? depositWalletAddress : null) ??
     eoa) as `0x${string}` | undefined
-  const { data } = useBalance({
-    address,
-    token: USDC_ADDRESS,
-    query: { enabled: !!address && !!USDC_ADDRESS },
-  })
+  const { data } = useUsdcBalance(address)
 
   if (!data) return null
 
@@ -190,11 +184,7 @@ function MintUsdcButton() {
   const { address: eoa } = useAccount()
   const smartWalletAddress = useAuthStore((s) => s.smartWalletAddress)
   const address = (smartWalletAddress ?? eoa) as `0x${string}` | undefined
-  const { data: balance } = useBalance({
-    address,
-    token: USDC_ADDRESS,
-    query: { enabled: !!address && !!USDC_ADDRESS },
-  })
+  const { data: balance } = useUsdcBalance(address)
   // "Empty" = whatever the header shows as 0.00. Strict `=== 0n` misses dust
   // (a few units left over from trades) that still renders as a zero balance.
   // The balance shows 2 dp, so anything under 0.005 tokens rounds to 0.00.
