@@ -281,6 +281,11 @@
     },
     {
       "type": "error",
+      "name": "MarginAboveMaximum",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "MarketCapitalExceeded",
       "inputs": []
     },
@@ -2498,6 +2503,86 @@
     },
     {
       "type": "event",
+      "name": "PositionMarginLocked",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "owner",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "marginUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "totalLockedMarginUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "PositionMarginReleased",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "owner",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "marginUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "foldedIntoWaterfall",
+          "type": "bool",
+          "indexed": false,
+          "internalType": "bool"
+        },
+        {
+          "name": "totalLockedMarginUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
       "name": "PositionOpened",
       "inputs": [
         {
@@ -3041,6 +3126,73 @@
     },
     {
       "type": "event",
+      "name": "SettlePositionFinalizedWithReturn",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "signer",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "saleReceivedUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "tokensSoldUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "returnedTokenUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "positionTokenUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "marketOutcome",
+          "type": "uint8",
+          "indexed": false,
+          "internalType": "uint8"
+        },
+        {
+          "name": "settledInFavor",
+          "type": "bool",
+          "indexed": false,
+          "internalType": "bool"
+        },
+        {
+          "name": "sanityCheckPassed",
+          "type": "bool",
+          "indexed": false,
+          "internalType": "bool"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
       "name": "SettlePositionInitiated",
       "inputs": [
         {
@@ -3512,6 +3664,152 @@
         },
         {
           "name": "venueFeeUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "signature",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "signatureExpiry",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "createPositionPushFundedWithMargin",
+      "inputs": [
+        {
+          "name": "positionSeed",
+          "type": "bytes16",
+          "internalType": "bytes16"
+        },
+        {
+          "name": "marketId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "tokenId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "collateralUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "leverageBps",
+          "type": "uint32",
+          "internalType": "uint32"
+        },
+        {
+          "name": "notionalUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "originationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "lifetimeFeeAprBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "liquidationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "venueFeeUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "marginUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "signature",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "signatureExpiry",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "createPositionWithMargin",
+      "inputs": [
+        {
+          "name": "positionSeed",
+          "type": "bytes16",
+          "internalType": "bytes16"
+        },
+        {
+          "name": "marketId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "tokenId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "collateralUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "leverageBps",
+          "type": "uint32",
+          "internalType": "uint32"
+        },
+        {
+          "name": "notionalUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "originationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "lifetimeFeeAprBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "liquidationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "venueFeeUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "marginUsdcUnits",
           "type": "uint256",
           "internalType": "uint256"
         },
@@ -4264,6 +4562,92 @@
     },
     {
       "type": "function",
+      "name": "finalizeSettleWithReturn",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "saleReceivedUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "marketOutcome",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "settledInFavor",
+          "type": "bool",
+          "internalType": "bool"
+        },
+        {
+          "name": "returnedTokenUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "signature",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "signatureExpiry",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "finalizeSettleWithReturnPushFunded",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "saleReceivedUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "marketOutcome",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "settledInFavor",
+          "type": "bool",
+          "internalType": "bool"
+        },
+        {
+          "name": "returnedTokenUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "signature",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "signatureExpiry",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
       "name": "flagUnwindDuringPartialClose",
       "inputs": [
         {
@@ -4867,6 +5251,11 @@
           "name": "originalPositionTokenUnits",
           "type": "uint256",
           "internalType": "uint256"
+        },
+        {
+          "name": "lockedMarginUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
         }
       ],
       "stateMutability": "view"
@@ -5329,6 +5718,19 @@
           "internalType": "uint256"
         }
       ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "totalLockedMarginUsdcUnits",
+      "inputs": [],
       "outputs": [
         {
           "name": "",

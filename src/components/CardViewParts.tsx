@@ -106,7 +106,7 @@ export function MicroStat({
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          borderRadius: 2,
+          borderRadius: 0,
         }}
       >
         {value}

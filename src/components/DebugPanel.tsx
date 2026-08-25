@@ -5,6 +5,7 @@ import {
   clearErrorLog,
   extractStack,
   formatErrorEntry,
+  formatErrorLog,
   getErrorLog,
   logError,
   subscribeErrorLog,
@@ -23,6 +24,7 @@ const levelColor: Record<ErrorLogEntry['level'], string> = {
 export function DebugPanel() {
   const [open, setOpen] = useState(false)
   const [copiedTs, setCopiedTs] = useState<number | null>(null)
+  const [copiedAll, setCopiedAll] = useState(false)
   const [sampleEventsStatus, setSampleEventsStatus] = useState<string | null>(null)
   const [sampleEventsPending, setSampleEventsPending] = useState(false)
   const entries = useErrorLog()
@@ -44,6 +46,12 @@ export function DebugPanel() {
     void navigator.clipboard?.writeText(formatErrorEntry(e))
     setCopiedTs(e.ts)
     setTimeout(() => setCopiedTs(null), 1500)
+  }
+
+  const copyAll = () => {
+    void navigator.clipboard?.writeText(formatErrorLog())
+    setCopiedAll(true)
+    setTimeout(() => setCopiedAll(false), 1500)
   }
 
   const sendSampleEvents = async () => {
@@ -108,7 +116,7 @@ export function DebugPanel() {
             flexDirection: 'column',
             background: 'var(--card-elevated)',
             border: '1px solid var(--border-strong)',
-            borderRadius: 8,
+            borderRadius: 0,
             boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
             fontFamily: 'var(--font)',
           }}
@@ -129,6 +137,15 @@ export function DebugPanel() {
               </span>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={copyAll}
+                disabled={entries.length === 0}
+                title="Copy every entry, with the environment header"
+                style={{ ...btnStyle, opacity: entries.length === 0 ? 0.4 : 1 }}
+              >
+                {copiedAll ? 'Copied' : 'Copy all'}
+              </button>
               <button
                 type="button"
                 onClick={clearErrorLog}
@@ -197,7 +214,7 @@ export function DebugPanel() {
                     padding: '8px 10px',
                     borderLeft: `3px solid ${levelColor[e.level]}`,
                     background: 'var(--card)',
-                    borderRadius: 4,
+                    borderRadius: 0,
                     marginBottom: 6,
                   }}
                 >
@@ -297,7 +314,7 @@ export function DebugPanel() {
 const btnStyle: React.CSSProperties = {
   background: 'var(--card)',
   border: '1px solid var(--border-strong)',
-  borderRadius: 4,
+  borderRadius: 0,
   color: 'var(--text)',
   fontSize: 11,
   fontFamily: 'var(--font)',

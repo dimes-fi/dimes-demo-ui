@@ -175,7 +175,7 @@ export function PartialCloseSlider({
           gap: 6,
           marginTop: 10,
           padding: '8px 10px',
-          borderRadius: 8,
+          borderRadius: 0,
           background: 'rgba(255,255,255,0.03)',
           border: '1px solid rgba(255,255,255,0.06)',
         }}

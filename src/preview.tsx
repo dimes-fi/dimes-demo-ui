@@ -14,6 +14,8 @@ import { PartialCloseChart } from './components/PartialCloseChart'
 import { SettledCard } from './components/SettledCard'
 import { QuoteDetails } from './components/QuoteDetails'
 import { TradePanel } from './components/TradePanel'
+import { RiskModeRail, type CommittedPlan } from './components/RiskModeRail'
+import { RiskModeChoice } from './components/RiskModeChoice'
 import { usePartialOpenStore } from './store/partialOpen'
 import type {
   Market,
@@ -23,6 +25,23 @@ import type {
   PositionUnwindList,
   PositionPartialCloseList,
 } from './api/types'
+
+const sparseCommittedPlan: CommittedPlan = {
+  liquidationPriceUsd: '0.2750',
+  steps: [
+    { triggerPriceUsd: '0.4200', targetLeverageBps: 17500 },
+    { triggerPriceUsd: '0.3600', targetLeverageBps: 15000 },
+    { triggerPriceUsd: '0.3100', targetLeverageBps: 12000 },
+  ],
+}
+
+const denseCommittedPlan: CommittedPlan = {
+  liquidationPriceUsd: '0.2200',
+  steps: Array.from({ length: 24 }, (_, index) => ({
+    triggerPriceUsd: (0.48 - index * 0.0105).toFixed(4),
+    targetLeverageBps: Math.round(19500 - index * 390),
+  })),
+}
 
 const mockPerNotional = {
   at100UsdBps: 100000,
@@ -45,6 +64,11 @@ const mockMarket: Market = {
   status: 'active',
   settlementState: 'none',
   provider: 'polymarket',
+  event: {
+    ticker: 'btc-price-milestones-2026',
+    title: 'BTC price milestones 2026',
+    seriesTicker: 'btc-price-milestones',
+  },
   polymarket: {
     conditionId: '0xcondition',
     noTokenId: '654321',
@@ -159,6 +183,9 @@ const mockOffer: Offer = {
   provider: 'polymarket',
   signatureExpiry: '9999999999',
   slippageBps: 200,
+  polygonVaultFunctionName: 'createPosition',
+  riskMode: 'adaptive',
+  marginUsdcUnits: '0',
   totalUserAmountUsd: '10.50',
   totalUserAmountUsdPips: '105000',
   totalUserAmountUsdcUnits: '10500000',
@@ -177,6 +204,8 @@ const mockOpenPosition: OpenPosition = {
     collateralUsd: '10.00',
     collateralUsdPips: '100000',
     leverageBps: 50000,
+    riskMode: 'adaptive',
+    lockedMarginUsdcUnits: '0',
     notionalUsd: '50.00',
     notionalUsdPips: '500000',
     openedAt: '2026-03-20T10:00:00Z',
@@ -311,9 +340,9 @@ const mockUnwindList: PositionUnwindList = {
   currentLeverageBps: 20000,
   hasMore: false,
   data: [
-    { executedAt: '2025-06-02T14:30:00.000Z', beforeLeverageBps: 60000, afterLeverageBps: 40000, reason: 'spread_blowout', reasonDetail: 'The bid-ask spread widened sharply beyond its recent baseline, signalling thinning liquidity.' },
-    { executedAt: '2025-06-03T18:15:00.000Z', beforeLeverageBps: 40000, afterLeverageBps: 30000, reason: 'depth_decay', reasonDetail: 'Resting order-book depth fell well below its recent peak.' },
-    { executedAt: '2025-06-04T09:45:00.000Z', beforeLeverageBps: 30000, afterLeverageBps: 20000, reason: 'price_drop_severe', reasonDetail: "The position's side fell sharply against the position." },
+    { status: 'executed', executedAt: '2025-06-02T14:30:00.000Z', beforeLeverageBps: 60000, afterLeverageBps: 40000, reason: 'spread_blowout', reasonDetail: 'The bid-ask spread widened sharply beyond its recent baseline, signalling thinning liquidity.' },
+    { status: 'executed', executedAt: '2025-06-03T18:15:00.000Z', beforeLeverageBps: 40000, afterLeverageBps: 30000, reason: 'depth_decay', reasonDetail: 'Resting order-book depth fell well below its recent peak.' },
+    { status: 'executed', executedAt: '2025-06-04T09:45:00.000Z', beforeLeverageBps: 30000, afterLeverageBps: 20000, reason: 'price_drop_severe', reasonDetail: "The position's side fell sharply against the position." },
   ],
 }
 
@@ -393,6 +422,8 @@ const mockClosedPosition: ClosedPosition = {
     collateralUsd: '25.00',
     collateralUsdPips: '250000',
     leverageBps: 40000,
+    riskMode: 'adaptive',
+    lockedMarginUsdcUnits: '0',
     notionalUsd: '100.00',
     notionalUsdPips: '1000000',
     openedAt: '2026-03-10T10:00:00Z',
@@ -463,6 +494,53 @@ const demoBtn: React.CSSProperties = {
  * (table). The strip is rendered with acceptingNewPositions=true so a pending
  * (not-yet-accepting) discovery stays hidden until it flips.
  */
+function RiskModeQuoteDemo({
+  plan,
+  depositUsd,
+  isCommittedOffered = true,
+}: {
+  plan: CommittedPlan
+  depositUsd: string
+  isCommittedOffered?: boolean
+}) {
+  const [mode, setMode] = useState<'adaptive' | 'committed'>('adaptive')
+  const baseTotalUsd = 262.5
+  const totalUsd = mode === 'committed' ? baseTotalUsd + Number(depositUsd) : baseTotalUsd
+
+  return (
+    <div style={{ padding: '12px 0' }}>
+      <RiskModeChoice
+        value={mode}
+        marginUsdcUnits={isCommittedOffered ? String(Number(depositUsd) * 1e6) : null}
+        isCommittedOffered={isCommittedOffered}
+        unavailableMessage={isCommittedOffered ? undefined : 'Not offered on crypto markets.'}
+        entryPriceUsd="0.51"
+        entryLeverageBps={20000}
+        adaptiveLiquidationPriceUsd="0.42"
+        currentPriceUsd="0.495"
+        committedPlan={isCommittedOffered ? plan : null}
+        onChange={setMode}
+      />
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginTop: 16,
+          paddingTop: 10,
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          fontSize: 13,
+        }}
+      >
+        <span style={{ color: 'var(--text-muted)' }}>You pay</span>
+        <span style={{ color: 'var(--text)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+          ${totalUsd.toFixed(2)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function LiveDemo() {
   const counter = useRef(0)
   const pending = useRef<string[]>([])
@@ -558,6 +636,7 @@ function LiveDemo() {
               market={m}
               onSelect={() => {}}
               onCopy={() => {}}
+              onScopeToEvent={() => {}}
               isCopied={false}
               isSelected={false}
             />
@@ -707,6 +786,45 @@ export default function Preview() {
         <div style={{ maxWidth: 420, marginBottom: 40 }}>
           <CardShell>
             <QuoteDetails offer={mockOffer} />
+          </CardShell>
+        </div>
+
+        {/* Risk mode rail */}
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: '#5B9CF5', marginBottom: 12 }}>Risk mode — quote (3 steps)</h2>
+        <div style={{ maxWidth: 420, marginBottom: 40 }}>
+          <CardShell>
+            <RiskModeQuoteDemo plan={sparseCommittedPlan} depositUsd="75.76" />
+          </CardShell>
+        </div>
+
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: '#5B9CF5', marginBottom: 12 }}>Risk mode — quote (24 steps)</h2>
+        <div style={{ maxWidth: 420, marginBottom: 40 }}>
+          <CardShell>
+            <RiskModeQuoteDemo plan={denseCommittedPlan} depositUsd="112.40" />
+          </CardShell>
+        </div>
+
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: '#5B9CF5', marginBottom: 12 }}>Risk mode — committed unavailable</h2>
+        <div style={{ maxWidth: 420, marginBottom: 40 }} data-testid="risk-mode-unavailable-preview">
+          <CardShell>
+            <RiskModeQuoteDemo plan={sparseCommittedPlan} depositUsd="75.76" isCommittedOffered={false} />
+          </CardShell>
+        </div>
+
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: '#5B9CF5', marginBottom: 12 }}>Risk mode — open position (2 steps used)</h2>
+        <div style={{ maxWidth: 420, marginBottom: 40 }}>
+          <CardShell>
+            <div style={{ padding: '12px 0' }}>
+              <RiskModeRail
+                entryPriceUsd="0.51"
+                entryLeverageBps={20000}
+                adaptiveLiquidationPriceUsd="0.42"
+                committed={sparseCommittedPlan}
+                selected="committed"
+                view="position"
+                firedTriggerPricesUsd={['0.4200', '0.3600']}
+              />
+            </div>
           </CardShell>
         </div>
 

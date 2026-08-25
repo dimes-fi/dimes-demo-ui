@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useMarkets } from '../hooks/useMarkets'
+import type { MarketScopeKind } from '../api/markets'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import { useFlashOnChange } from '../hooks/useFlashOnChange'
 import type { Market } from '../api/types'
@@ -56,6 +57,19 @@ export function MarketList({
   const [status, setStatusState] = useState<string | undefined>(() => getQueryParam('status'))
   const [eligible, setEligibleState] = useState<string | undefined>('yes')
   const [copiedTicker, setCopiedTicker] = useState<string | null>(null)
+  const [advancedOpen, setAdvancedOpen] = useState(
+    () => !!getQueryParam('event') || !!getQueryParam('series'),
+  )
+  const [scopeKind, setScopeKindState] = useState<MarketScopeKind>(() =>
+    getQueryParam('series') ? 'series' : 'event',
+  )
+  const [scopeTicker, setScopeTicker] = useState(
+    () => getQueryParam('event') ?? getQueryParam('series') ?? '',
+  )
+  const [debouncedScopeTicker, setDebouncedScopeTicker] = useState(
+    () => getQueryParam('event') ?? getQueryParam('series') ?? '',
+  )
+  const scopeDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -87,17 +101,35 @@ export function MarketList({
     setEligibleState(v)
     resetPagination()
   }
+  const setScopeKind = (v: MarketScopeKind) => {
+    setScopeKindState(v)
+    resetPagination()
+  }
+
+  useEffect(() => {
+    scopeDebounceRef.current = setTimeout(() => {
+      setDebouncedScopeTicker(scopeTicker.trim())
+      resetPagination()
+    }, 300)
+    return () => clearTimeout(scopeDebounceRef.current)
+  }, [scopeTicker])
 
   useEffect(() => {
     setQueryParams({
       q: debouncedSearch || undefined,
       category,
       status,
+      event: scopeKind === 'event' ? debouncedScopeTicker || undefined : undefined,
+      series: scopeKind === 'series' ? debouncedScopeTicker || undefined : undefined,
       after: cursor,
     })
-  }, [debouncedSearch, category, status, cursor])
+  }, [debouncedSearch, category, status, cursor, scopeKind, debouncedScopeTicker])
 
   const acceptingNewPositions = eligible === 'yes' ? true : eligible === 'no' ? false : undefined
+
+  const scope = debouncedScopeTicker
+    ? { kind: scopeKind, ticker: debouncedScopeTicker }
+    : undefined
 
   const { data: page, isLoading, isFetching } = useMarkets(
     category,
@@ -106,6 +138,7 @@ export function MarketList({
     acceptingNewPositions,
     cursor,
     'depth_desc',
+    scope,
   )
 
   const queryClient = useQueryClient()
@@ -153,6 +186,14 @@ export function MarketList({
     navigator.clipboard.writeText(ticker)
     setCopiedTicker(ticker)
     setTimeout(() => setCopiedTicker(null), 1500)
+  }
+
+  /** Jump the advanced filter straight to a market's event, so a ticker never has to be typed. */
+  function scopeToEvent(eventTicker: string) {
+    setAdvancedOpen(true)
+    setScopeKindState('event')
+    setScopeTicker(eventTicker)
+    resetPagination()
   }
 
 
@@ -213,6 +254,7 @@ export function MarketList({
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
+
             strokeLinecap="round"
             strokeLinejoin="round"
             style={{
@@ -231,6 +273,56 @@ export function MarketList({
             to { transform: rotate(-360deg); }
           }
         `}</style>
+      </div>
+
+      {/* Advanced: narrow the list to one event or series. Kept collapsed — this is a power-user filter. */}
+      <div className="markets-scope">
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen((open) => !open)}
+          className="markets-scope__toggle"
+          aria-expanded={advancedOpen}
+        >
+          {advancedOpen ? '−' : '+'} Advanced
+          {!advancedOpen && scope ? ` · ${scope.kind}: ${scope.ticker}` : ''}
+        </button>
+
+        {advancedOpen && (
+          <div className="markets-scope__row">
+            <select
+              value={scopeKind}
+              onChange={(e) => setScopeKind(e.target.value as MarketScopeKind)}
+              className="markets-toolbar__select"
+              aria-label="Filter markets by event or series"
+            >
+              <option value="event">Event ticker</option>
+              <option value="series">Series ticker</option>
+            </select>
+            <input
+              type="text"
+              placeholder={
+                scopeKind === 'event' ? 'e.g. btc-updown-5m-1786109700' : 'e.g. btc-up-or-down-5m'
+              }
+              value={scopeTicker}
+              onChange={(e) => setScopeTicker(e.target.value)}
+              className="markets-toolbar__input"
+              aria-label={scopeKind === 'event' ? 'Event ticker' : 'Series ticker'}
+            />
+            {scopeTicker && (
+              <button type="button" onClick={() => setScopeTicker('')} className="markets-toolbar__refresh">
+                Clear
+              </button>
+            )}
+          </div>
+        )}
+
+        {advancedOpen && (
+          <p className="markets-scope__hint">
+            An event is one real-world happening (a single game, one 5-minute price window). A series is the
+            recurring template those events come from, so it spans every event in it. Copy a ticker from a
+            market&apos;s event details.
+          </p>
+        )}
       </div>
 
       {isLoading ? (
@@ -300,6 +392,7 @@ export function MarketList({
                     market={market}
                     onSelect={onSelectMarket}
                     onCopy={copyTicker}
+                    onScopeToEvent={scopeToEvent}
                     isCopied={copiedTicker === market.ticker}
                     isSelected={market.id === selectedMarketId}
                   />
@@ -338,12 +431,14 @@ export function MarketRow({
   market,
   onSelect,
   onCopy,
+  onScopeToEvent,
   isCopied,
   isSelected,
 }: {
   market: Market
   onSelect: (market: Market) => void
   onCopy: (ticker: string) => void
+  onScopeToEvent?: (eventTicker: string) => void
   isCopied: boolean
   isSelected: boolean
 }) {
@@ -402,6 +497,19 @@ export function MarketRow({
         >
           {market.title || '—'}
         </span>
+        {market.event?.ticker && onScopeToEvent && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onScopeToEvent(market.event.ticker)
+            }}
+            className="mkt-event-chip"
+            title={`Show every market on this event (${market.event.ticker})`}
+          >
+            {market.event.title || market.event.ticker}
+          </button>
+        )}
       </td>
       <td style={{ ...tdStyle, textAlign: 'center' }}>
         {market.category && (

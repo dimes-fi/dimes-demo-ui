@@ -4,7 +4,7 @@ import {
   MIN_FILL_BPS_STEP,
 } from '../utils/partialFill'
 
-// Opt-in for partial fills on open. A switch reveals a 20%–50% slider (5% steps)
+// Opt-in for partial fills on open. A switch reveals a 20%–70% slider (5% steps)
 // for `minFillBps`. Range + step are guaranteed here, so the server only ever
 // rejects on the notional floor-cap (handled inline by the trade panel).
 export function PartialFillControl({

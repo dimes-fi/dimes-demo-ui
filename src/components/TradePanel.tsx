@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useAccount, useBalance } from 'wagmi'
-import type { Market, MarketLeverage } from '../api/types'
+import { useAccount } from 'wagmi'
+import type { Market, MarketLeverage, RiskMode } from '../api/types'
 import {
   leverageMaxBps,
   maxViableLeverageBpsForCollateral,
@@ -13,12 +13,7 @@ import { useTradeMachine, buildQuoteParams, withPartialFill } from '../hooks/use
 import { useFeeRates } from '../hooks/useFeeRates'
 import { useValueTween } from '../hooks/useValueTween'
 import { usePendingPositionsStore } from '../store/pendingPositions'
-import {
-  useApproveUsdc,
-  useCheckAllowance,
-  useCreatePosition,
-  USDC_ADDRESS,
-} from '../contract/hooks'
+import { useApproveUsdc, useCheckAllowance, useCreatePosition } from '../contract/hooks'
 import { useCreatePositionPushFunded } from '../contract/pushFundedHooks'
 import { useCreatePositionSmart } from '../contract/smartWalletHooks'
 import { useAuthStore } from '../store/auth'
@@ -32,6 +27,7 @@ import { formatContractError } from '../contract/error-messages'
 import { useToastStore } from '../store/toasts'
 import { LeverageSlider } from './LeverageSlider'
 import { PartialFillControl } from './PartialFillControl'
+import { RiskModeChoice } from './RiskModeChoice'
 import { MIN_FILL_BPS_DEFAULT, partialFillErrorMessage, snapMinFillBps } from '../utils/partialFill'
 import { QuoteDetails } from './QuoteDetails'
 import { TradeEstimate } from './TradeEstimate'
@@ -53,12 +49,23 @@ function formatCreateError(error: unknown): string {
 const PRESET_AMOUNTS = [50, 100, 500] as const
 const DEFAULT_SLIPPAGE_BPS = 800 // 8%
 const DEFAULT_LEVERAGE_BPS = 20000 // 2x
+
+// The API lowercases every error code it returns (see the customer error filter), so these must be
+// lowercase to match — an uppercase constant here silently never fires.
+const committedRiskModeUnavailableCode = 'quote_committed_risk_mode_unavailable'
+const betaFeatureNotEnabledCode = 'beta_feature_not_enabled'
 const SLIPPAGE_PRESETS_BPS = [200, 500, 800] as const
 // Floor the slider step at 0.5x even when the API publishes something finer
 // (e.g. 2500bps = 0.25x). 0.5x keeps leverage labels to a single decimal
 // (2.5x, not 1.25x) and stops the dots from crowding the track. We still honour
 // the API step when it's coarser than this — only the fine end is clamped.
 const FORCED_LEVERAGE_STEP_BPS = 5000 // 0.5x
+
+const USD_PIPS_PER_USD = 1e4
+
+function pipsToUsd(pips: string): string {
+  return (Number(pips) / USD_PIPS_PER_USD).toFixed(4)
+}
 
 function leverageStepBps(market: { leverage: MarketLeverage }) {
   return Math.max(market.leverage.stepBps, FORCED_LEVERAGE_STEP_BPS)
@@ -122,6 +129,7 @@ export function TradePanel({
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [allowPartialFill, setAllowPartialFill] = useState(false)
   const [minFillBps, setMinFillBps] = useState(MIN_FILL_BPS_DEFAULT)
+  const [riskMode, setRiskMode] = useState<RiskMode>('adaptive')
 
   const { data: feeRates } = useFeeRates(market.ticker)
 
@@ -129,12 +137,6 @@ export function TradePanel({
   const addPendingStub = usePendingPositionsStore((s) => s.add)
   const removePendingStub = usePendingPositionsStore((s) => s.remove)
   const { address, isConnected } = useAccount()
-  const { data: usdcBalance } = useBalance({
-    address,
-    token: USDC_ADDRESS,
-    query: { enabled: !!address },
-  })
-
   // Real state (not a ref): the render output below gates on it, so it must
   // trigger a re-render when toggled. It's flipped from effects that sync the
   // trade machine's phase, hence the scoped set-state-in-effect disables.
@@ -200,7 +202,11 @@ export function TradePanel({
     draft?.polygonVaultContractAddress as `0x${string}` | undefined,
   )
 
-  const requiredApproval = draft ? BigInt(draft.totalUserAmountUsdcUnits) : 0n
+  // A draft is always priced as adaptive, so committed mode's margin — which the promoted
+  // quote adds to totalUserAmount and the vault pulls on open — has to be approved on top.
+  const committedMargin =
+    riskMode === 'committed' ? BigInt(draft?.committedUnwinds?.marginRequiredUsdcUnits ?? '0') : 0n
+  const requiredApproval = draft ? BigInt(draft.totalUserAmountUsdcUnits) + committedMargin : 0n
   const hasAllowance = allowance !== undefined && allowance >= requiredApproval && requiredApproval > 0n
   // Deposit-wallet and AA modes fund/approve inside the batch, so no separate
   // ERC-20 approval step is needed.
@@ -313,12 +319,6 @@ export function TradePanel({
     updateCollateral(String(current + delta))
   }
 
-  const handleMax = () => {
-    if (!usdcBalance) return
-    const asDollars = Number(usdcBalance.value) / 1_000_000
-    updateCollateral(asDollars.toFixed(2))
-  }
-
   const handleGetQuote = () => {
     if (!canGetQuote) return
     hasAutoRetriedRef.current = false
@@ -336,6 +336,44 @@ export function TradePanel({
   const apiErr = offerError && typeof offerError === 'object' && 'code' in offerError
     ? offerError as { code: string; params: Record<string, unknown> | null }
     : null
+  // The API refuses committed mode outright when this quote cannot price a ladder, and refuses it with the beta
+  // code when the feature is not enabled for this partner. Nothing the user can do about either, and the position
+  // is perfectly openable without it, so drop back to adaptive rather than leaving them on a mode that can only
+  // keep failing.
+  const isCommittedRefused =
+    apiErr?.code === committedRiskModeUnavailableCode ||
+    (apiErr?.code === betaFeatureNotEnabledCode && apiErr.params?.feature === 'committed_risk_mode')
+  useEffect(() => {
+    if (isCommittedRefused && riskMode === 'committed') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- derived reset when the API refuses the mode
+      setRiskMode('adaptive')
+    }
+  }, [isCommittedRefused, riskMode])
+
+  // No draft yet means no verdict yet — the deposit option only greys out once a quote has said no.
+  const isCommittedOffered = draft == null || draft.committedUnwinds?.available === true
+  const committedPlan = useMemo(() => {
+    const committed = draft?.committedUnwinds
+    if (!committed?.plannedUnwinds || !committed.debtClearPriceUsdPips) return null
+
+    return {
+      liquidationPriceUsd: pipsToUsd(committed.debtClearPriceUsdPips),
+      steps: committed.plannedUnwinds.map((rung) => ({
+        triggerPriceUsd: pipsToUsd(rung.triggerPriceUsdPips),
+        targetLeverageBps: rung.targetLeverageBps,
+      })),
+    }
+  }, [draft?.committedUnwinds])
+
+  // A quote can come back priced as adaptive because committed was refused for these terms, which
+  // would otherwise leave the disabled deposit option looking selected.
+  useEffect(() => {
+    if (draft != null && !isCommittedOffered && riskMode === 'committed') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- derived reset when the quote refuses the mode
+      setRiskMode('adaptive')
+    }
+  }, [draft, isCommittedOffered, riskMode])
+
   const partialFillError = partialFillErrorMessage(apiErr?.code, apiErr?.params)
   const offerHint = quoteErrorHint(
     apiErr?.code ?? null,
@@ -435,6 +473,10 @@ export function TradePanel({
           leverageBps: adjustedLeverage,
           collateralUsd: adjustedCollateral,
           slippageBps: adjustedSlippage,
+          // These params replace the ones the draft was taken with, so the mode has to be
+          // repeated — dropping it silently re-quotes as adaptive while the panel still
+          // shows the committed ladder and its deposit.
+          riskMode,
         }),
         { allowPartialFill, minFillBps: adjustedMinFill },
       ))
@@ -524,12 +566,12 @@ export function TradePanel({
 
   const handleCreate = () => {
     if (!draft) return
-    promote(draft)
+    promote(draft, 0, riskMode)
   }
 
   const handleAcceptChanges = () => {
     if (tradeState.phase !== 'market-moved') return
-    acceptChanges(tradeState.newDraft, tradeState.retryCount)
+    acceptChanges(tradeState.newDraft, tradeState.retryCount, riskMode)
   }
 
   // When a quote lands, the drawer grows with the quote details + Create button
@@ -678,14 +720,6 @@ export function TradePanel({
                 +${amount}
               </button>
             ))}
-            <button
-              type="button"
-              className="quick-btn"
-              onClick={handleMax}
-              disabled={!usdcBalance}
-            >
-              MAX
-            </button>
           </div>
         </div>
 
@@ -881,7 +915,6 @@ export function TradePanel({
             side={side}
             collateralUsd={collateralNum}
             leverageBps={leverageBps}
-            slippageBps={slippageBps}
             feeRates={feeRates}
           />
         )}
@@ -893,6 +926,28 @@ export function TradePanel({
             previousOffer={isMarketMoved ? tradeState.originalDraft : correctedFrom}
             quotedAt={quotedAt}
             onRefresh={handleGetQuote}
+            selectedRiskMode={riskMode}
+          />
+        )}
+
+        {draft && (
+          <RiskModeChoice
+            value={riskMode}
+            marginUsdcUnits={draft.committedUnwinds?.marginRequiredUsdcUnits ?? null}
+            isCommittedOffered={isCommittedOffered}
+            unavailableMessage={draft.committedUnwinds?.unavailableReason?.message}
+            entryPriceUsd={draft.entryPriceUsd}
+            entryLeverageBps={draft.leverageBps}
+            adaptiveLiquidationPriceUsd={draft.currentLiquidationPriceUsd}
+            currentPriceUsd={
+              market.prices
+                ? side === 'yes'
+                  ? market.prices.yesBidPriceUsd
+                  : market.prices.noBidPriceUsd
+                : null
+            }
+            committedPlan={committedPlan}
+            onChange={setRiskMode}
           />
         )}
 

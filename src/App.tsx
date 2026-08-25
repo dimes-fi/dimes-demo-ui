@@ -78,6 +78,8 @@ function App() {
     sortBy: 'created_at',
     sortDirection: 'desc',
     state: 'active',
+    // TODO: re-add 'planned_unwinds' once the committed-mode API is deployed — sandbox
+    // currently allows only unwinds and total_count, and rejects the whole request otherwise.
     expand: ['unwinds'],
   })
   const openCount = activePositions?.filter(isOpenPosition).length
@@ -164,6 +166,7 @@ function App() {
                     <div className="trade-drawer__inner dimes-scroll">
                       {drawerMarket && (
                         <TradePanel
+                          key={drawerMarket.id}
                           market={drawerMarket}
                           onClose={() => setSelectedMarket(null)}
                         />
@@ -182,6 +185,7 @@ function App() {
                   <div className="trade-drawer__inner dimes-scroll">
                     {drawerMarket && (
                       <TradePanel
+                        key={drawerMarket.id}
                         market={drawerMarket}
                         onClose={() => setSelectedMarket(null)}
                       />

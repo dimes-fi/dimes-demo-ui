@@ -26,6 +26,8 @@ export function PositionList() {
     sortBy: 'created_at',
     sortDirection: 'desc',
     state: apiState,
+    // TODO: re-add 'planned_unwinds' once the committed-mode API is deployed — sandbox
+    // currently allows only unwinds and total_count, and rejects the whole request otherwise.
     expand: ['unwinds'],
   })
 

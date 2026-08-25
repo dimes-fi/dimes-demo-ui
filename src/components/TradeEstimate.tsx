@@ -30,14 +30,12 @@ export function TradeEstimate({
   side,
   collateralUsd,
   leverageBps,
-  slippageBps,
   feeRates,
 }: {
   market: Market
   side: 'yes' | 'no'
   collateralUsd: number
   leverageBps: number
-  slippageBps: number
   feeRates: FeeRates
 }) {
   const estimate = useMemo(() => {
@@ -49,7 +47,10 @@ export function TradeEstimate({
     const notionalUsd = collateralUsd * (leverageBps / 10000)
     const notionalUsdcUnits = Math.round(notionalUsd * USDC_UNITS_PER_USD)
 
-    const positionTokenUnits = expectedPositionTokenUnits(notionalUsdcUnits, entryPriceUsd, slippageBps)
+    // Max gain is the best case, so it assumes a fill at the quoted price.
+    // slippageBps is a tolerance (worst acceptable fill), not an expected fill —
+    // applying it here made max gain negative on high-priced legs.
+    const positionTokenUnits = expectedPositionTokenUnits(notionalUsdcUnits, entryPriceUsd, 0)
 
     const originationFeeBps = resolveOriginationFeeBps(
       feeRates.originationFeeTiers,
@@ -86,7 +87,7 @@ export function TradeEstimate({
       liquidationPriceUsd,
       netMaxGainUsdcUnits: maxGain.netMaxGainUsdcUnits,
     }
-  }, [market, side, collateralUsd, leverageBps, slippageBps, feeRates])
+  }, [market, side, collateralUsd, leverageBps, feeRates])
 
   if (!estimate) return null
 

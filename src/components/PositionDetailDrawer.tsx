@@ -16,6 +16,7 @@ import { PartialCloseChart } from './PartialCloseChart'
 import { useCancelPosition } from '../hooks/useCancelPosition'
 import { useContractInfo } from '../hooks/useContractInfo'
 import { usePartialCloses } from '../hooks/usePartialCloses'
+import { RiskModeRail } from './RiskModeRail'
 import { useAuthStore } from '../store/auth'
 import { formatSlippageBps } from '../utils/format'
 import { ErrorBanner } from './ErrorBanner'
@@ -592,6 +593,7 @@ function OpenPositionDetail({
           <div style={{ marginTop: 10 }}>
             <LeverageChart unwinds={unwinds} isLoading={isUnwindsLoading} />
           </div>
+          <CommittedLadderSection position={position} />
         </StatGroup>
 
         <StatGroup label="Timing" last>
@@ -1002,6 +1004,52 @@ function ClosedPositionDetail({
           </div>
         </StatGroup>
       </div>
+    </div>
+  )
+}
+
+const USD_PIPS_PER_USD = 1e4
+const USDC_UNITS_PER_USD = 1e6
+
+// The signed ladder for a committed position, carried inline on the position by
+// `expand=planned_unwinds`. Rungs that already fired or were superseded by a
+// partial close come back with their own status, so the rail can show the whole
+// promise, not just what is left of it.
+function CommittedLadderSection({ position }: { position: OpenPosition }) {
+  if (position.entry.riskMode !== 'committed') return null
+
+  const rungs = (position.plannedUnwinds?.data ?? []).filter((row) => row.triggerPriceUsdPips != null)
+  if (rungs.length === 0) return null
+
+  const firedTriggerPricesUsd = rungs
+    .filter((row) => row.status === 'triggered')
+    .map((row) => (Number(row.triggerPriceUsdPips) / USD_PIPS_PER_USD).toFixed(4))
+
+  const steps = rungs
+    .filter((row) => row.status !== 'superseded')
+    .map((row) => ({
+      triggerPriceUsd: (Number(row.triggerPriceUsdPips) / USD_PIPS_PER_USD).toFixed(4),
+      targetLeverageBps: row.afterLeverageBps,
+    }))
+
+  const lastStep = steps[steps.length - 1]
+  if (!lastStep) return null
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <RiskModeRail
+        entryPriceUsd={position.entry.priceUsd}
+        entryLeverageBps={position.entry.leverageBps}
+        adaptiveLiquidationPriceUsd={position.risk.currentLiquidationPriceUsd}
+        committed={{ liquidationPriceUsd: lastStep.triggerPriceUsd, steps: steps.slice(0, -1) }}
+        selected="committed"
+        view="position"
+        firedTriggerPricesUsd={firedTriggerPricesUsd}
+      />
+      <StatRow
+        label="Refundable deposit"
+        value={`$${(Number(position.entry.lockedMarginUsdcUnits) / USDC_UNITS_PER_USD).toFixed(2)}`}
+      />
     </div>
   )
 }

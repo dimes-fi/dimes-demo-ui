@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useQuoteMachine, type QuoteMachineState } from '@dimes-dot-fi/sdk/react';
 import { buildQuoteParams } from '@dimes-dot-fi/sdk';
-import type { CreateOfferParams, Offer } from '@dimes-dot-fi/sdk';
+import type { CreateOfferParams, Offer, RiskMode } from '@dimes-dot-fi/sdk';
 
 // ---------------------------------------------------------------------------
 // The interactive draft → review → promote → (market-moved accept) machine now
@@ -19,6 +19,7 @@ export interface UseTradeMachineParams {
   slippageBps: number;
   allowPartialFill?: boolean;
   minFillBps?: number;
+  riskMode?: RiskMode;
 }
 
 export type OfferParamsWithPartial = CreateOfferParams & {
@@ -73,6 +74,7 @@ export function useTradeMachine() {
         slippageBps: params.slippageBps,
         allowPartialFill: params.allowPartialFill,
         minFillBps: params.minFillBps,
+        riskMode: params.riskMode,
       }),
     [sdkGetDraft],
   );

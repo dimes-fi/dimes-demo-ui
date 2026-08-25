@@ -7,8 +7,8 @@
 
 /** Minimum acceptable `minFillBps` — 20%. */
 export const MIN_FILL_BPS_MIN = 2000
-/** Maximum acceptable `minFillBps` — 50%. */
-export const MIN_FILL_BPS_MAX = 5000
+/** Maximum acceptable `minFillBps` — 70%. */
+export const MIN_FILL_BPS_MAX = 7000
 /** `minFillBps` must be a multiple of this (5% steps). */
 export const MIN_FILL_BPS_STEP = 500
 /** Default minimum fill when the user first opts in — conservative 50%. */
@@ -67,14 +67,14 @@ function belowFloorMessage(params: PartialFillErrorParams): string {
  * we map all of them so a stale/edge request still reads cleanly.
  */
 export const PARTIAL_FILL_ERROR_MESSAGES: Record<string, PartialFillErrorEntry> = {
-  QUOTE_MIN_FILL_BPS_REQUIRES_FAK:
+  quote_min_fill_bps_requires_fak:
     'Partial-fill request was malformed. Please re-quote.',
-  QUOTE_MIN_FILL_BPS_OUT_OF_RANGE:
-    'Minimum fill must be between 20% and 50%.',
-  QUOTE_MIN_FILL_BPS_STEP_INVALID:
+  quote_min_fill_bps_out_of_range:
+    'Minimum fill must be between 20% and 70%.',
+  quote_min_fill_bps_step_invalid:
     'Minimum fill must be set in 5% steps.',
-  QUOTE_MIN_FILL_BPS_BELOW_FLOOR: belowFloorMessage,
-  QUOTE_FAK_ORDER_TYPE_DISABLED:
+  quote_min_fill_bps_below_floor: belowFloorMessage,
+  quote_fak_order_type_disabled:
     'Partial fills are temporarily unavailable. Turn off partial fill to continue.',
 }
 

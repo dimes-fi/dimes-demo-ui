@@ -12,8 +12,8 @@ importers:
   .:
     dependencies:
       '@dimes-dot-fi/sdk':
-        specifier: ^2.4.0
-        version: 2.4.0(@tanstack/react-query@5.101.4(react@19.2.8))(bufferutil@4.1.0)(react@19.2.8)(utf-8-validate@5.0.10)(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
+        specifier: ^2.5.0
+        version: 2.5.0(@tanstack/react-query@5.101.4(react@19.2.8))(bufferutil@4.1.0)(react@19.2.8)(utf-8-validate@5.0.10)(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
       '@privy-io/react-auth':
         specifier: ^3.35.2
         version: 3.35.2(@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@solana/sysvars@5.5.1(typescript@5.9.3))(@tanstack/query-core@5.101.4)(@tanstack/react-query@5.101.4(react@19.2.8))(@types/react@19.2.17)(bufferutil@4.1.0)(permissionless@0.3.7(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.8))(utf-8-validate@5.0.10)(zod@4.4.3)
@@ -292,8 +292,8 @@ packages:
     resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
     engines: {node: '>=20.19.0'}
 
-  '@dimes-dot-fi/sdk@2.4.0':
-    resolution: {integrity: sha512-uw/zMab87exdkHX+rjJVfLAGkPKkHKGyr0Q0EHZ/nlmoMj5t5weD9TFItvzgp2cQVyPkf3EV7CA4ALG1Uk+F7Q==}
+  '@dimes-dot-fi/sdk@2.5.0':
+    resolution: {integrity: sha512-+k+Nl6bDipBmn44MDN9YBwGig3bsGOuq82w0zoILKCvZLhLKK8sjxPeAvy0lDV4zp18suC+2Od3dIof35MbPZA==}
     peerDependencies:
       '@tanstack/react-query': '>=5'
       react: '>=19'
@@ -4919,7 +4919,7 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@dimes-dot-fi/sdk@2.4.0(@tanstack/react-query@5.101.4(react@19.2.8))(bufferutil@4.1.0)(react@19.2.8)(utf-8-validate@5.0.10)(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))':
+  '@dimes-dot-fi/sdk@2.5.0(@tanstack/react-query@5.101.4(react@19.2.8))(bufferutil@4.1.0)(react@19.2.8)(utf-8-validate@5.0.10)(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))':
     dependencies:
       humps: 2.0.1
       socket.io-client: 4.8.3(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -5364,7 +5364,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.6
       '@types/debug': 4.1.13
-      debug: 4.3.4
+      debug: 4.4.3
       pony-cause: 2.1.11
       semver: 7.8.5
       uuid: 9.0.1
@@ -5378,7 +5378,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.6
       '@types/debug': 4.1.13
-      debug: 4.3.4
+      debug: 4.4.3
       pony-cause: 2.1.11
       semver: 7.8.5
       uuid: 9.0.1
@@ -9952,7 +9952,7 @@ snapshots:
 
   extension-port-stream@3.0.0:
     dependencies:
-      readable-stream: 3.6.2
+      readable-stream: 4.7.0
       webextension-polyfill: 0.10.0
 
   fast-copy@3.0.2: {}

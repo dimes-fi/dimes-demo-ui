@@ -7,14 +7,22 @@ import {
   useAccount,
   useChainId,
 } from 'wagmi';
-import { parseGwei, getAddress, encodeFunctionData, type PublicClient, type TransactionReceipt } from 'viem';
+import {
+  parseGwei,
+  getAddress,
+  encodeFunctionData,
+  recoverTypedDataAddress,
+  type PublicClient,
+  type TransactionReceipt,
+} from 'viem';
 import { vaultAbi, erc20Abi } from './abi';
-import { assertQuoteSigner, resolveExpectedSigner } from '@dimes-dot-fi/sdk/contract';
+import { assertQuoteSigner, buildCreatePositionTx, resolveExpectedSigner } from '@dimes-dot-fi/sdk/contract';
 import { useContractInfo } from '../hooks/useContractInfo';
 import { getUsdcAddress } from '../runtimeConfig';
 import { useAuthStore } from '../store/auth';
 import { getSmartWalletClient } from './smartWalletClient';
 import type { Offer } from '../api/types';
+import { logError } from '../utils/errorLog';
 
 const POLYGON_AMOY_CHAIN_ID = 80002;
 
@@ -30,6 +38,121 @@ function useGasOverrides() {
 }
 
 export const USDC_ADDRESS = getUsdcAddress();
+
+
+// Signature-mismatch diagnostics.
+//
+// When the recovered signer does not match the authority from /contract-info, the recovery itself
+// tells us nothing — a payload that differs in any field recovers to a random address. So we
+// recover the same signature against BOTH create types and record the exact payload we hashed.
+// Recovering to the real authority under `CreatePosition` on a quote labelled committed means the
+// API signed the adaptive struct; neither matching means a field value differs.
+const CREATE_POSITION_FIELDS = [
+  { name: 'positionSeed', type: 'bytes16' },
+  { name: 'user', type: 'address' },
+  { name: 'marketId', type: 'bytes32' },
+  { name: 'tokenId', type: 'uint256' },
+  { name: 'collateralUsdcUnits', type: 'uint256' },
+  { name: 'leverageBps', type: 'uint32' },
+  { name: 'notionalUsdcUnits', type: 'uint256' },
+  { name: 'originationFeeBps', type: 'uint16' },
+  { name: 'lifetimeFeeAprBps', type: 'uint16' },
+  { name: 'liquidationFeeBps', type: 'uint16' },
+  { name: 'venueFeeUsdcUnits', type: 'uint256' },
+  { name: 'signatureExpiry', type: 'uint256' },
+] as const
+
+const CREATE_POSITION_WITH_MARGIN_FIELDS = [
+  ...CREATE_POSITION_FIELDS.slice(0, 11),
+  { name: 'marginUsdcUnits', type: 'uint256' },
+  { name: 'signatureExpiry', type: 'uint256' },
+] as const
+
+async function recoverAgainst(
+  primaryType: string,
+  fields: readonly { name: string; type: string }[],
+  domain: Record<string, unknown>,
+  message: Record<string, unknown>,
+  signature: `0x${string}`,
+): Promise<string> {
+  try {
+    return await recoverTypedDataAddress({
+      domain,
+      types: { [primaryType]: fields },
+      primaryType,
+      message,
+      signature,
+    } as never)
+  } catch (e) {
+    return `threw: ${e instanceof Error ? e.message : String(e)}`
+  }
+}
+
+export async function buildSignerDiagnostics(
+  offer: Offer,
+  userAddress: `0x${string}`,
+  expectedSigner: string,
+): Promise<Record<string, unknown>> {
+  const domain = {
+    name: 'LeveragedPredictionVaultV1',
+    version: '1',
+    chainId: Number(offer.evmChainId),
+    verifyingContract: getAddress(offer.polygonVaultContractAddress),
+  }
+
+  const message = {
+    positionSeed: offer.positionSeedHex,
+    user: userAddress,
+    marketId: offer.polymarketMarketId,
+    tokenId: BigInt(offer.polymarketTokenId),
+    collateralUsdcUnits: BigInt(offer.collateralUsdcUnits),
+    leverageBps: offer.leverageBps,
+    notionalUsdcUnits: BigInt(offer.notionalUsdcUnits),
+    originationFeeBps: offer.originationFeeBps,
+    lifetimeFeeAprBps: offer.lifetimeFeeAprBps,
+    liquidationFeeBps: offer.liquidationFeeBps,
+    venueFeeUsdcUnits: BigInt(offer.expectedOpenTradingFeeUsdcUnits),
+    signatureExpiry: BigInt(offer.signatureExpiry),
+  }
+  const marginUsdcUnits = BigInt(offer.marginUsdcUnits ?? 0)
+  const signature = offer.contractSignature as `0x${string}`
+
+  const [adaptiveSigner, committedSigner] = await Promise.all([
+    recoverAgainst('CreatePosition', CREATE_POSITION_FIELDS, domain, message, signature),
+    recoverAgainst(
+      'CreatePositionWithMargin',
+      CREATE_POSITION_WITH_MARGIN_FIELDS,
+      domain,
+      { ...message, marginUsdcUnits },
+      signature,
+    ),
+  ])
+
+  return {
+    expectedSigner,
+    quoteRiskMode: offer.riskMode,
+    recoveredAsCreatePosition: adaptiveSigner,
+    recoveredAsCreatePositionWithMargin: committedSigner,
+    matches:
+      getAddress(expectedSigner) === adaptiveSigner
+        ? 'CreatePosition (API signed the adaptive struct)'
+        : getAddress(expectedSigner) === committedSigner
+          ? 'CreatePositionWithMargin'
+          : 'neither — a field value differs',
+    domain,
+    signedMessage: {
+      ...message,
+      tokenId: message.tokenId.toString(),
+      collateralUsdcUnits: message.collateralUsdcUnits.toString(),
+      notionalUsdcUnits: message.notionalUsdcUnits.toString(),
+      venueFeeUsdcUnits: message.venueFeeUsdcUnits.toString(),
+      signatureExpiry: message.signatureExpiry.toString(),
+      marginUsdcUnits: marginUsdcUnits.toString(),
+    },
+    contractSignature: offer.contractSignature,
+  }
+}
+
 
 async function diagnoseRevert(
   publicClient: PublicClient,
@@ -304,29 +427,32 @@ export function useCreatePosition() {
     try {
       await assertQuoteSigner(offer, getAddress(offer.authorityPublicKey), expectedSigner);
     } catch (e) {
+      // Record which EIP-712 type the signature actually belongs to, so the diagnostics panel
+      // carries the answer rather than just the mismatch.
+      let context: Record<string, unknown> | undefined;
+      try {
+        context = await buildSignerDiagnostics(
+          offer,
+          getAddress(offer.authorityPublicKey),
+          expectedSigner,
+        );
+      } catch {
+        // diagnostics must never mask the verification failure itself
+      }
+      logError({
+        level: 'error',
+        title: 'Quote signature did not match the API authority',
+        detail: e instanceof Error ? e.message : String(e),
+        context,
+        source: 'toast',
+      });
       setVerifyError(e instanceof Error ? e : new Error('Failed to verify offer signature.'));
       return;
     }
 
-    const params = {
-      address: offer.polygonVaultContractAddress as `0x${string}`,
-      abi: vaultAbi,
-      functionName: 'createPosition' as const,
-      args: [
-        offer.positionSeedHex as `0x${string}`,
-        offer.polymarketMarketId as `0x${string}`,
-        BigInt(offer.polymarketTokenId),
-        BigInt(offer.collateralUsdcUnits),
-        offer.leverageBps,
-        BigInt(offer.notionalUsdcUnits),
-        offer.originationFeeBps,
-        offer.lifetimeFeeAprBps,
-        offer.liquidationFeeBps,
-        BigInt(offer.expectedOpenTradingFeeUsdcUnits),
-        offer.contractSignature as `0x${string}`,
-        BigInt(offer.signatureExpiry),
-      ] as const,
-    };
+    // The builder picks createPosition or createPositionWithMargin from the offer itself —
+    // a committed offer's signature only authorizes the margin-bearing entry point.
+    const params = buildCreatePositionTx(offer);
 
     try {
       await publicClient!.simulateContract({ ...params, account });

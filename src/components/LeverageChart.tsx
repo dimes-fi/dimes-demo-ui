@@ -32,6 +32,7 @@ function buildChartPoints(unwindList: PositionUnwindList, endAt?: Date): {
   }
 
   for (const unwind of unwindList.data) {
+    if (unwind.executedAt == null) continue
     points.push({
       date: new Date(unwind.executedAt),
       leverageBps: unwind.afterLeverageBps,

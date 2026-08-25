@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchMarkets, searchMarkets } from '../api/markets';
-import type { MarketSort } from '../api/markets';
+import type { MarketScope, MarketSort } from '../api/markets';
 import type { Market } from '../api/types';
 import { useAuthStore } from '../store/auth';
 
@@ -19,13 +19,18 @@ export function useMarkets(
   acceptingNewPositions?: boolean,
   startingAfter?: string,
   sort?: MarketSort,
+  scope?: MarketScope,
 ) {
   const jwt = useAuthStore((s) => s.jwt);
 
   return useQuery<MarketsPage>({
     // The 'dimes','markets' prefix matches the SDK's cache key so useMarketStream's
     // reconcile mode merges eligibility/leverage deltas straight into this query.
-    queryKey: ['dimes', 'markets', { category, search, status, acceptingNewPositions, startingAfter, sort }],
+    queryKey: [
+      'dimes',
+      'markets',
+      { category, search, status, acceptingNewPositions, startingAfter, sort, scope },
+    ],
     queryFn: async () => {
       if (search) {
         const data = await searchMarkets({
@@ -33,6 +38,7 @@ export function useMarkets(
           category: category || undefined,
           status: status || undefined,
           acceptingNewPositions,
+          scope,
         });
         return { data, hasMore: false };
       }
@@ -44,6 +50,7 @@ export function useMarkets(
         limit: PAGE_SIZE,
         startingAfter,
         expand: ['total_count', 'prices'],
+        scope,
       });
     },
     enabled: !!jwt,

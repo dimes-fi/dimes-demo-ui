@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import type { Offer } from '../api/types'
+import type { Offer, RiskMode } from '../api/types'
 import { computeMaxGain } from '../api/types'
 import { formatUsd } from '../utils/format'
 import { formatFillPct } from '../utils/partialFill'
@@ -47,14 +47,37 @@ export function QuoteDetails({
   previousOffer,
   quotedAt,
   onRefresh,
+  selectedRiskMode = 'adaptive',
 }: {
   offer: Offer
   hideExpiry?: boolean
   previousOffer?: Offer
   quotedAt?: number
   onRefresh?: () => void
+  /**
+   * The mode the user has picked. A draft quote never carries one of its own — it always reports
+   * adaptive with a zero deposit — so the committed terms are shown against this selection and the
+   * deposit is read from the quote's committedUnwinds block.
+   */
+  selectedRiskMode?: RiskMode
 }) {
   const expiresAtMs = useMemo(() => new Date(offer.expiresAt).getTime(), [offer.expiresAt])
+
+  // A draft prices itself as adaptive whatever the user has picked, so the deposit has to be added
+  // back here to show what committing would actually cost. A real offer already includes it.
+  const totalUserAmountUsd = useMemo(() => {
+    const marginRequiredUsdcUnits = offer.committedUnwinds?.marginRequiredUsdcUnits
+    if (
+      selectedRiskMode !== 'committed' ||
+      marginRequiredUsdcUnits == null ||
+      offer.riskMode === 'committed'
+    ) {
+      return offer.totalUserAmountUsd
+    }
+
+    const marginUsd = Number(marginRequiredUsdcUnits) / USDC_UNITS_PER_USD
+    return (Number(offer.totalUserAmountUsd) + marginUsd).toFixed(2)
+  }, [offer.committedUnwinds, offer.riskMode, offer.totalUserAmountUsd, selectedRiskMode])
 
   const [totalSeconds] = useState(() =>
     Math.max(1, Math.round((expiresAtMs - Date.now()) / 1000)),
@@ -170,7 +193,7 @@ export function QuoteDetails({
 
       <StatRow
         label="You pay"
-        value={`$${offer.totalUserAmountUsd}`}
+        value={`$${totalUserAmountUsd}`}
         valueColor="#ffffff"
         previousValue={prev ? `$${prev.totalUserAmountUsd}` : undefined}
       />
@@ -192,8 +215,45 @@ export function QuoteDetails({
         </>
       )}
 
+      <CommittedUnwindsSection offer={offer} selectedRiskMode={selectedRiskMode} />
+
       {!hideExpiry && <QuoteExpiryBar secondsLeft={secondsLeft} totalSeconds={totalSeconds} />}
     </div>
+  )
+}
+
+function CommittedUnwindsSection({
+  offer,
+  selectedRiskMode,
+}: {
+  offer: Offer
+  selectedRiskMode: RiskMode
+}) {
+  const committed = offer.committedUnwinds
+  if (!committed) return null
+
+  if (!committed.available) {
+    return null
+  }
+
+  if (committed.marginRequiredUsdcUnits == null) {
+    return null
+  }
+
+  // The row is drawn in both modes so that picking committed only changes the figure, never the
+  // height of the panel — switching modes used to shove every row below it down the page.
+  const isCommitted = selectedRiskMode === 'committed'
+
+  return (
+    <StatRow
+      label="Refundable deposit"
+      value={
+        isCommitted
+          ? `$${(Number(committed.marginRequiredUsdcUnits) / USDC_UNITS_PER_USD).toFixed(2)}`
+          : '$0.00'
+      }
+      valueColor={isCommitted ? undefined : 'var(--text-dim)'}
+    />
   )
 }
 

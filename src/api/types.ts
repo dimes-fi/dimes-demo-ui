@@ -9,6 +9,7 @@ export type {
   MarketSidedMaxLeveragePerNotional,
   OriginationTier,
   Offer,
+  RiskMode,
   OpenPosition,
   ClosedPosition,
   Position,
