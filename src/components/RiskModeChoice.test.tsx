@@ -4,7 +4,6 @@ import { RiskModeChoice } from './RiskModeChoice'
 import type { CommittedPlan } from './RiskModeRail'
 
 const quotedPlan: CommittedPlan = {
-  liquidationPriceUsd: '0.2800',
   steps: [
     { triggerPriceUsd: '0.4200', targetLeverageBps: 21000 },
     { triggerPriceUsd: '0.3600', targetLeverageBps: 15000 },
@@ -50,7 +49,15 @@ describe('RiskModeChoice', () => {
 
     const [, committedCard] = cards()
     expect(within(committedCard).getByText('42¢')).toBeInTheDocument()
-    expect(within(committedCard).getByText('28¢')).toBeInTheDocument()
+    expect(within(committedCard).getByText('36¢')).toBeInTheDocument()
+  })
+
+  it('marks a liquidation level on the adaptive ladder only', () => {
+    renderChoice()
+
+    const [adaptiveCard, committedCard] = cards()
+    expect(within(adaptiveCard).getByText('liq')).toBeInTheDocument()
+    expect(within(committedCard).queryByText('liq')).toBeNull()
   })
 
   it('selects a mode when the card is clicked anywhere', () => {

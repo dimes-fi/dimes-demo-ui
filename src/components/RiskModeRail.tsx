@@ -26,7 +26,6 @@ export interface CommittedStep {
 }
 
 export interface CommittedPlan {
-  liquidationPriceUsd: string
   steps: CommittedStep[]
 }
 
@@ -34,7 +33,6 @@ interface Mark {
   priceUsd: number
   leverageBps: number
   label: string
-  isLiquidation: boolean
   isFired: boolean
 }
 
@@ -65,26 +63,14 @@ function useMeasuredWidth(initial: number) {
 function buildCommittedMarks(plan: CommittedPlan, firedPricesUsd: string[]): Mark[] {
   const fired = new Set(firedPricesUsd.map((price) => Number(price)))
 
-  const stepMarks = plan.steps
+  return plan.steps
     .map((step) => ({
       priceUsd: Number(step.triggerPriceUsd),
       leverageBps: step.targetLeverageBps,
       label: formatCents(Number(step.triggerPriceUsd)),
-      isLiquidation: false,
       isFired: fired.has(Number(step.triggerPriceUsd)),
     }))
     .sort((a, b) => b.priceUsd - a.priceUsd)
-
-  return [
-    ...stepMarks,
-    {
-      priceUsd: Number(plan.liquidationPriceUsd),
-      leverageBps: ONE_X_BPS,
-      label: formatCents(Number(plan.liquidationPriceUsd)),
-      isLiquidation: true,
-      isFired: false,
-    },
-  ]
 }
 
 export function RiskModeRail({
@@ -430,7 +416,7 @@ function CommittedLane({
   marks.forEach((mark, index) => {
     const y = toY(mark.priceUsd)
     const isEdge = index === 0 || index === marks.length - 1
-    const visible = !isExample && (isEdge || mark.isLiquidation || y - lastLabelY >= MIN_LABEL_SPACING)
+    const visible = !isExample && (isEdge || y - lastLabelY >= MIN_LABEL_SPACING)
     if (visible) lastLabelY = y
     labelVisibility.push(visible)
   })
@@ -477,10 +463,9 @@ function CommittedLane({
               <text
                 x={x}
                 y={y + 3.5}
-                fontSize={mark.isLiquidation ? 11 : 10}
+                fontSize={10}
                 fontFamily="var(--font)"
-                fill={mark.isLiquidation ? 'var(--text)' : 'var(--text-muted)'}
-                fontWeight={mark.isLiquidation ? 600 : 400}
+                fill="var(--text-muted)"
               >
                 {mark.label}
               </text>
@@ -500,9 +485,9 @@ function CommittedLane({
                 y={y + 3.5}
                 fontSize={10}
                 fontFamily="var(--font)"
-                fill={mark.isLiquidation ? 'var(--text-dim)' : 'var(--text)'}
+                fill="var(--text)"
               >
-                {mark.isLiquidation ? 'liq' : formatLeverage(mark.leverageBps)}
+                {formatLeverage(mark.leverageBps)}
               </text>
             )}
           </g>

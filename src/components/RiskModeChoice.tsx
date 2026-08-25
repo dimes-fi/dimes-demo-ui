@@ -8,7 +8,6 @@ const ADAPTIVE_COLOR = '#F5A623'
 const COMMITTED_COLOR = '#5B9CF5'
 
 const exampleCommittedPlan: CommittedPlan = {
-  liquidationPriceUsd: '0.3000',
   steps: [
     { triggerPriceUsd: '0.4400', targetLeverageBps: 22500 },
     { triggerPriceUsd: '0.3800', targetLeverageBps: 16000 },

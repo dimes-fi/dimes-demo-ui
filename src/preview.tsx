@@ -27,7 +27,6 @@ import type {
 } from './api/types'
 
 const sparseCommittedPlan: CommittedPlan = {
-  liquidationPriceUsd: '0.2750',
   steps: [
     { triggerPriceUsd: '0.4200', targetLeverageBps: 17500 },
     { triggerPriceUsd: '0.3600', targetLeverageBps: 15000 },
@@ -36,7 +35,6 @@ const sparseCommittedPlan: CommittedPlan = {
 }
 
 const denseCommittedPlan: CommittedPlan = {
-  liquidationPriceUsd: '0.2200',
   steps: Array.from({ length: 24 }, (_, index) => ({
     triggerPriceUsd: (0.48 - index * 0.0105).toFixed(4),
     targetLeverageBps: Math.round(19500 - index * 390),

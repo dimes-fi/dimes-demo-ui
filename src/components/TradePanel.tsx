@@ -354,10 +354,9 @@ export function TradePanel({
   const isCommittedOffered = draft == null || draft.committedUnwinds?.available === true
   const committedPlan = useMemo(() => {
     const committed = draft?.committedUnwinds
-    if (!committed?.plannedUnwinds || !committed.debtClearPriceUsdPips) return null
+    if (!committed?.plannedUnwinds) return null
 
     return {
-      liquidationPriceUsd: pipsToUsd(committed.debtClearPriceUsdPips),
       steps: committed.plannedUnwinds.map((rung) => ({
         triggerPriceUsd: pipsToUsd(rung.triggerPriceUsdPips),
         targetLeverageBps: rung.targetLeverageBps,

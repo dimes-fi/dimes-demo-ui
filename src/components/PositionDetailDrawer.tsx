@@ -1032,16 +1032,13 @@ function CommittedLadderSection({ position }: { position: OpenPosition }) {
       targetLeverageBps: row.afterLeverageBps,
     }))
 
-  const lastStep = steps[steps.length - 1]
-  if (!lastStep) return null
-
   return (
     <div style={{ marginTop: 12 }}>
       <RiskModeRail
         entryPriceUsd={position.entry.priceUsd}
         entryLeverageBps={position.entry.leverageBps}
         adaptiveLiquidationPriceUsd={position.risk.currentLiquidationPriceUsd}
-        committed={{ liquidationPriceUsd: lastStep.triggerPriceUsd, steps: steps.slice(0, -1) }}
+        committed={{ steps }}
         selected="committed"
         view="position"
         firedTriggerPricesUsd={firedTriggerPricesUsd}
