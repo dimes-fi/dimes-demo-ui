@@ -246,6 +246,11 @@
     },
     {
       "type": "error",
+      "name": "InvalidProtocolVersion",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "InvalidSignature",
       "inputs": []
     },
@@ -321,12 +326,22 @@
     },
     {
       "type": "error",
+      "name": "PartialCloseAboveMaxSlice",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "PartialCloseBelowMinCollateral",
       "inputs": []
     },
     {
       "type": "error",
       "name": "PartialCloseBelowMinSlice",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PartialCloseSharesOutMismatch",
       "inputs": []
     },
     {
@@ -347,6 +362,11 @@
     {
       "type": "error",
       "name": "PositionNotFound",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ProceedsExceedTokenValue",
       "inputs": []
     },
     {
@@ -372,6 +392,11 @@
     {
       "type": "error",
       "name": "ReentrancyGuardReentrantCall",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "RefundReductionExceedsPending",
       "inputs": []
     },
     {
@@ -413,7 +438,22 @@
     },
     {
       "type": "error",
+      "name": "ShareContractAlreadySet",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ShareContractHasNoCode",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "SignatureExpired",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "StalePendingRefund",
       "inputs": []
     },
     {
@@ -434,6 +474,11 @@
     {
       "type": "error",
       "name": "TokenIdMismatch",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "TokenIdProtocolVersionMismatch",
       "inputs": []
     },
     {
@@ -460,6 +505,11 @@
     {
       "type": "error",
       "name": "UnauthorizedTokenSender",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "UnmappedProtocolVersion",
       "inputs": []
     },
     {
@@ -1560,6 +1610,61 @@
     },
     {
       "type": "event",
+      "name": "OverCreditedRefundCorrected",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "admin",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "refundReductionUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "pendingRefundUsdcUnitsAfter",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "capitalPoolBalanceUsdcUnitsAfter",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "consumedRecoveryNonce",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "indexed": false,
+          "internalType": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
       "name": "PartialCloseAborted",
       "inputs": [
         {
@@ -1631,6 +1736,18 @@
         },
         {
           "name": "deleverageCapitalUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "deleverageCapitalAppliedUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "capitalShortfallUsdcUnits",
           "type": "uint256",
           "indexed": false,
           "internalType": "uint256"
@@ -1739,6 +1856,18 @@
           "internalType": "uint256"
         },
         {
+          "name": "deleverageCapitalAppliedUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "capitalShortfallUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
           "name": "collectedLifetimeFeeUsdcUnits",
           "type": "uint256",
           "indexed": false,
@@ -1831,6 +1960,18 @@
         },
         {
           "name": "deleverageCapitalUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "deleverageCapitalAppliedUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "capitalShortfallUsdcUnits",
           "type": "uint256",
           "indexed": false,
           "internalType": "uint256"
@@ -2276,6 +2417,109 @@
         },
         {
           "name": "state",
+          "type": "uint8",
+          "indexed": false,
+          "internalType": "uint8"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "PositionCreatedWithVersion",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "positionSeed",
+          "type": "bytes16",
+          "indexed": false,
+          "internalType": "bytes16"
+        },
+        {
+          "name": "owner",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "marketId",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "tokenId",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "collateralUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "leverageBps",
+          "type": "uint32",
+          "indexed": false,
+          "internalType": "uint32"
+        },
+        {
+          "name": "notionalUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "originationFeeUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "venueFeeUsdcUnits",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "originationFeeBps",
+          "type": "uint16",
+          "indexed": false,
+          "internalType": "uint16"
+        },
+        {
+          "name": "lifetimeFeeAprBps",
+          "type": "uint16",
+          "indexed": false,
+          "internalType": "uint16"
+        },
+        {
+          "name": "liquidationFeeBps",
+          "type": "uint16",
+          "indexed": false,
+          "internalType": "uint16"
+        },
+        {
+          "name": "state",
+          "type": "uint8",
+          "indexed": false,
+          "internalType": "uint8"
+        },
+        {
+          "name": "protocolVersion",
           "type": "uint8",
           "indexed": false,
           "internalType": "uint8"
@@ -3236,6 +3480,31 @@
     },
     {
       "type": "event",
+      "name": "ShareContractSet",
+      "inputs": [
+        {
+          "name": "protocolVersion",
+          "type": "uint8",
+          "indexed": true,
+          "internalType": "uint8"
+        },
+        {
+          "name": "shareContract",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "timestamp",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
       "name": "TimelockUpdated",
       "inputs": [
         {
@@ -3547,6 +3816,39 @@
     },
     {
       "type": "function",
+      "name": "correctOverCreditedRefund",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "expectedRecoveryNonce",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "expectedPendingRefundUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "refundReductionUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "internalType": "string"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
       "name": "createPosition",
       "inputs": [
         {
@@ -3756,6 +4058,157 @@
     },
     {
       "type": "function",
+      "name": "createPositionPushFundedWithMarginAndVersion",
+      "inputs": [
+        {
+          "name": "positionSeed",
+          "type": "bytes16",
+          "internalType": "bytes16"
+        },
+        {
+          "name": "marketId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "tokenId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "collateralUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "leverageBps",
+          "type": "uint32",
+          "internalType": "uint32"
+        },
+        {
+          "name": "notionalUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "originationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "lifetimeFeeAprBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "liquidationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "venueFeeUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "marginUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "protocolVersion",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "signature",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "signatureExpiry",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "createPositionPushFundedWithVersion",
+      "inputs": [
+        {
+          "name": "positionSeed",
+          "type": "bytes16",
+          "internalType": "bytes16"
+        },
+        {
+          "name": "marketId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "tokenId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "collateralUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "leverageBps",
+          "type": "uint32",
+          "internalType": "uint32"
+        },
+        {
+          "name": "notionalUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "originationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "lifetimeFeeAprBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "liquidationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "venueFeeUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "protocolVersion",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "signature",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "signatureExpiry",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
       "name": "createPositionWithMargin",
       "inputs": [
         {
@@ -3812,6 +4265,157 @@
           "name": "marginUsdcUnits",
           "type": "uint256",
           "internalType": "uint256"
+        },
+        {
+          "name": "signature",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "signatureExpiry",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "createPositionWithMarginAndVersion",
+      "inputs": [
+        {
+          "name": "positionSeed",
+          "type": "bytes16",
+          "internalType": "bytes16"
+        },
+        {
+          "name": "marketId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "tokenId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "collateralUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "leverageBps",
+          "type": "uint32",
+          "internalType": "uint32"
+        },
+        {
+          "name": "notionalUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "originationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "lifetimeFeeAprBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "liquidationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "venueFeeUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "marginUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "protocolVersion",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "signature",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "signatureExpiry",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "createPositionWithVersion",
+      "inputs": [
+        {
+          "name": "positionSeed",
+          "type": "bytes16",
+          "internalType": "bytes16"
+        },
+        {
+          "name": "marketId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "tokenId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "collateralUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "leverageBps",
+          "type": "uint32",
+          "internalType": "uint32"
+        },
+        {
+          "name": "notionalUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "originationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "lifetimeFeeAprBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "liquidationFeeBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "venueFeeUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "protocolVersion",
+          "type": "uint8",
+          "internalType": "uint8"
         },
         {
           "name": "signature",
@@ -4438,6 +5042,11 @@
           "name": "saleReceivedUsdcUnits",
           "type": "uint256",
           "internalType": "uint256"
+        },
+        {
+          "name": "expectedPendingTokenUnits",
+          "type": "uint256",
+          "internalType": "uint256"
         }
       ],
       "outputs": [],
@@ -4461,6 +5070,11 @@
           "name": "returnedTokenUnits",
           "type": "uint256",
           "internalType": "uint256"
+        },
+        {
+          "name": "expectedPendingTokenUnits",
+          "type": "uint256",
+          "internalType": "uint256"
         }
       ],
       "outputs": [],
@@ -4477,6 +5091,11 @@
         },
         {
           "name": "saleReceivedUsdcUnits",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "expectedPendingTokenUnits",
           "type": "uint256",
           "internalType": "uint256"
         }
@@ -5610,6 +6229,24 @@
     },
     {
       "type": "function",
+      "name": "setShareContract",
+      "inputs": [
+        {
+          "name": "protocolVersion",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "shareContract",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
       "name": "setTimelock",
       "inputs": [
         {
@@ -5659,6 +6296,44 @@
     },
     {
       "type": "function",
+      "name": "shareContractForPosition",
+      "inputs": [
+        {
+          "name": "positionKey",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "shareContractForVersion",
+      "inputs": [
+        {
+          "name": "protocolVersion",
+          "type": "uint8",
+          "internalType": "uint8"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
       "name": "supportsInterface",
       "inputs": [
         {
@@ -5685,6 +6360,25 @@
           "name": "",
           "type": "address",
           "internalType": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "tokenIdProtocolVersion",
+      "inputs": [
+        {
+          "name": "tokenId",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint8",
+          "internalType": "uint8"
         }
       ],
       "stateMutability": "view"

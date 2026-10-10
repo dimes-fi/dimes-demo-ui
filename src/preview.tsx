@@ -181,8 +181,9 @@ const mockOffer: Offer = {
   provider: 'polymarket',
   signatureExpiry: '9999999999',
   slippageBps: 200,
-  polygonVaultFunctionName: 'createPosition',
+  polymarketProtocolVersion: 1,
   riskMode: 'adaptive',
+  marginUsd: '0.00',
   marginUsdcUnits: '0',
   totalUserAmountUsd: '10.50',
   totalUserAmountUsdPips: '105000',
@@ -191,6 +192,7 @@ const mockOffer: Offer = {
 
 const mockOpenPosition: OpenPosition = {
   id: 'dm_pos_1',
+  partner: 'Dimes Demo',
   marketTicker: 'BTC-100K-JUN',
   side: 'yes',
   status: 'open',
@@ -203,6 +205,7 @@ const mockOpenPosition: OpenPosition = {
     collateralUsdPips: '100000',
     leverageBps: 50000,
     riskMode: 'adaptive',
+    lockedMarginUsd: '0.00',
     lockedMarginUsdcUnits: '0',
     notionalUsd: '50.00',
     notionalUsdPips: '500000',
@@ -409,6 +412,7 @@ const mockVoidedPosition: OpenPosition = {
 
 const mockClosedPosition: ClosedPosition = {
   id: 'dm_pos_2',
+  partner: 'Dimes Demo',
   marketTicker: 'ETH-MERGE-V2',
   side: 'no',
   status: 'settled',
@@ -421,6 +425,7 @@ const mockClosedPosition: ClosedPosition = {
     collateralUsdPips: '250000',
     leverageBps: 40000,
     riskMode: 'adaptive',
+    lockedMarginUsd: '0.00',
     lockedMarginUsdcUnits: '0',
     notionalUsd: '100.00',
     notionalUsdPips: '1000000',

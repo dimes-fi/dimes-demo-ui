@@ -44,9 +44,11 @@ export const USDC_ADDRESS = getUsdcAddress();
 //
 // When the recovered signer does not match the authority from /contract-info, the recovery itself
 // tells us nothing — a payload that differs in any field recovers to a random address. So we
-// recover the same signature against BOTH create types and record the exact payload we hashed.
+// recover the same signature against ALL FOUR create types and record the exact payload we hashed.
 // Recovering to the real authority under `CreatePosition` on a quote labelled committed means the
-// API signed the adaptive struct; neither matching means a field value differs.
+// API signed the adaptive struct; recovering under a `...Version` type on a version 1 quote (or the
+// reverse) means the API and the quote disagree on the Polymarket protocol version; none matching
+// means a field value differs.
 const CREATE_POSITION_FIELDS = [
   { name: 'positionSeed', type: 'bytes16' },
   { name: 'user', type: 'address' },
@@ -67,6 +69,21 @@ const CREATE_POSITION_WITH_MARGIN_FIELDS = [
   { name: 'marginUsdcUnits', type: 'uint256' },
   { name: 'signatureExpiry', type: 'uint256' },
 ] as const
+
+const CREATE_POSITION_WITH_VERSION_FIELDS = [
+  ...CREATE_POSITION_FIELDS.slice(0, 11),
+  { name: 'protocolVersion', type: 'uint8' },
+  { name: 'signatureExpiry', type: 'uint256' },
+] as const
+
+const CREATE_POSITION_WITH_MARGIN_AND_VERSION_FIELDS = [
+  ...CREATE_POSITION_FIELDS.slice(0, 11),
+  { name: 'marginUsdcUnits', type: 'uint256' },
+  { name: 'protocolVersion', type: 'uint8' },
+  { name: 'signatureExpiry', type: 'uint256' },
+] as const
+
+const POLYMARKET_PROTOCOL_V2 = 2
 
 async function recoverAgainst(
   primaryType: string,
@@ -117,7 +134,7 @@ export async function buildSignerDiagnostics(
   const marginUsdcUnits = BigInt(offer.marginUsdcUnits ?? 0)
   const signature = offer.contractSignature as `0x${string}`
 
-  const [adaptiveSigner, committedSigner] = await Promise.all([
+  const [adaptiveSigner, committedSigner, adaptiveV2Signer, committedV2Signer] = await Promise.all([
     recoverAgainst('CreatePosition', CREATE_POSITION_FIELDS, domain, message, signature),
     recoverAgainst(
       'CreatePositionWithMargin',
@@ -126,19 +143,40 @@ export async function buildSignerDiagnostics(
       { ...message, marginUsdcUnits },
       signature,
     ),
+    recoverAgainst(
+      'CreatePositionWithVersion',
+      CREATE_POSITION_WITH_VERSION_FIELDS,
+      domain,
+      { ...message, protocolVersion: POLYMARKET_PROTOCOL_V2 },
+      signature,
+    ),
+    recoverAgainst(
+      'CreatePositionWithMarginAndVersion',
+      CREATE_POSITION_WITH_MARGIN_AND_VERSION_FIELDS,
+      domain,
+      { ...message, marginUsdcUnits, protocolVersion: POLYMARKET_PROTOCOL_V2 },
+      signature,
+    ),
   ])
+
+  const expected = getAddress(expectedSigner)
+  const recoveredByType: [string, string][] = [
+    ['CreatePosition', adaptiveSigner],
+    ['CreatePositionWithMargin', committedSigner],
+    ['CreatePositionWithVersion (protocol version 2)', adaptiveV2Signer],
+    ['CreatePositionWithMarginAndVersion (protocol version 2)', committedV2Signer],
+  ]
+  const matchedType = recoveredByType.find(([, recovered]) => recovered === expected)?.[0]
 
   return {
     expectedSigner,
     quoteRiskMode: offer.riskMode,
+    quotePolymarketProtocolVersion: offer.polymarketProtocolVersion,
     recoveredAsCreatePosition: adaptiveSigner,
     recoveredAsCreatePositionWithMargin: committedSigner,
-    matches:
-      getAddress(expectedSigner) === adaptiveSigner
-        ? 'CreatePosition (API signed the adaptive struct)'
-        : getAddress(expectedSigner) === committedSigner
-          ? 'CreatePositionWithMargin'
-          : 'neither — a field value differs',
+    recoveredAsCreatePositionWithVersion: adaptiveV2Signer,
+    recoveredAsCreatePositionWithMarginAndVersion: committedV2Signer,
+    matches: matchedType ?? 'none — a field value differs',
     domain,
     signedMessage: {
       ...message,
@@ -450,8 +488,9 @@ export function useCreatePosition() {
       return;
     }
 
-    // The builder picks createPosition or createPositionWithMargin from the offer itself —
-    // a committed offer's signature only authorizes the margin-bearing entry point.
+    // The builder picks the entry point from the offer itself — riskMode chooses the plain or
+    // margin-bearing call and polymarketProtocolVersion 2 chooses their ...Version twins; a
+    // signature only authorizes the entry point it was issued for.
     const params = buildCreatePositionTx(offer);
 
     try {

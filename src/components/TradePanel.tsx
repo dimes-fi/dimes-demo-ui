@@ -934,7 +934,6 @@ export function TradePanel({
             value={riskMode}
             marginUsdcUnits={draft.committedUnwinds?.marginRequiredUsdcUnits ?? null}
             isCommittedOffered={isCommittedOffered}
-            unavailableMessage={draft.committedUnwinds?.unavailableReason?.message}
             entryPriceUsd={draft.entryPriceUsd}
             entryLeverageBps={draft.leverageBps}
             adaptiveLiquidationPriceUsd={draft.currentLiquidationPriceUsd}
